@@ -1,4 +1,4 @@
-def step_toward(pos, target, board_size):
+def step_toward(pos, target):
     """Return a single movement action (NORTH/SOUTH/EAST/WEST) that reduces
     Manhattan distance to target. Locked tiles are passable, so no
     obstacle-avoidance is needed."""
@@ -25,6 +25,8 @@ def agent(obs):
     opp_farm = obs["farms"][1 - player_id]
     shops = obs["town"]["unlocked_shops"]
     tiles = my_farm["tiles"]
+    private = obs["private"]
+    inventories = private["inventories"]
 
     daily_demand = { #default
         "WHEAT" : 1,
@@ -103,7 +105,6 @@ def agent(obs):
     hands_list = my_farm["hands"]
     worker_actions = []
     market_orders = []
-
     # 2. Market Execution (Hourly / Daily triggers)
     # Buy seeds, sell ready produce, hire farm hands
     if hour == 0:
@@ -114,16 +115,38 @@ def agent(obs):
         if day == 0:
             if my_farm["money"] >= 200 and obs["private"]["seeds"].get("MELON", 0) < 5:
                 market_orders.append(["BUY_SEED", "MELON", 5])
+            worker_actions.append(["WEST"])
 
     # 3. Task Selection & Route Execution
     # Determine what the farmer standing on (farmer_pos[0], farmer_pos[1]) needs to do
-    for i in range(len(hands_list) + 1):
-        if i == 0:
-            current_x, current_y = farmer_pos
-        else:
-            current_x, current_y = hands_list[i - 1]
-        current_tile = my_farm["tiles"][current_y][current_x]
-        worker_actions.append(["NORTH"])
+    elif hour < 24:
+        if len(my_farm["unlocked_quadrants"]) == 1:
+            for i in range(len(hands_list) + 1):
+                if i == 0:
+                    current_x, current_y = farmer_pos
+                else:
+                    current_x, current_y = hands_list[i - 1]
+                current_tile = my_farm["tiles"][current_y][current_x]
+                if i == 0:
+                    if current_x != 0:
+                        worker_actions.append(step_toward(farmer_pos, (0, 5)))
+                    else:
+                        if current_tile == None:
+                            print("empty")
+                        elif current_tile.get("kind") == "PLANT":
+                            if current_tile.get("crop") == "WHEAT":
+                                if current_tile.get("planted_day") - day >= 2: #bonus window of wheat
+                                    if not current_tile.get("watered_today"):
+                                        worker_actions.append(["WATER"])
+                                    elif current_tile.get("fertilized_until_day") == -1 and inventories[0]["FERTILIZER"] > 0:
+                                        worker_actions.append(["FERTILIZE"])
+                                    elif current_tile.get("planted_day") - day >= 4 or current_tile.get("yield_units") >= 6:
+                                        worker_actions.append(["HARVEST"])
+                                    else:
+                                        worker_actions.append(["PASS"])
+                else:
+                    worker_actions.append(["PASS"])
+            
 
 
     '''if current_tile and current_tile.get("kind") == "PLANT":
@@ -141,7 +164,7 @@ def agent(obs):
     # 4. Return commands to the engine
     # (Matches the competition's submission API schema)
     return {
-        "farmer": worker_actions[0],
-        "hands": worker_actions[1:],
+        "farmer": worker_actions[0] if worker_actions else "PASS",
+        "hands": [] if len(worker_actions) < 2  else worker_actions[1:],
         "market": market_orders,
     }

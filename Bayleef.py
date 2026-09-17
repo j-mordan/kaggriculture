@@ -24,10 +24,11 @@ def agent(obs):
     my_farm = obs["farms"][player_id]
     opp_farm = obs["farms"][1 - player_id]
     shops = obs["town"]["unlocked_shops"]
-    tiles = my_farm["tiles"]
+    my_tiles = my_farm["tiles"]
     private = obs["private"]
     inventories = private["inventories"]
     seeds = private["seeds"]
+    shed = private["shed"]
     prices = obs["market"]["prices"]
 
     daily_demand = { #default
@@ -71,7 +72,7 @@ def agent(obs):
         else:
             print('something went wrong with shop:', shop)
 
-    demand_EV_Day = { #every time a shop opens, demand spikes by this much per day
+    demand_EV_Day = { #every time a shop opens, demand spikes by this much per day, fix this
         "WHEAT" : 3.75,
         "CARROT" : 2.25,
         "MELON" : 0,
@@ -80,6 +81,76 @@ def agent(obs):
         "EGG" : 1.5,
         "MILK" : 2.25,
         "WOOL" : 1.5
+    }
+
+    projected_produced = {
+        "WHEAT" : 0,
+        "CARROT" : 0,
+        "MELON" : 0,
+        "TOMATO" : 0,
+        "STRAWBERRY" : 0,
+        "EGG" : 0,
+        "MILK" : 0,
+        "WOOL" : 0
+    }
+
+    max_harvest = {
+        "WHEAT" : 6,
+        "CARROT" : 4,
+        "MELON" : 6,
+        "TOMATO" : 12,
+        "STRAWBERRY" : 12,
+        "EGG" : 30 - day, #could need to be changed, this neglects the time for goose to mature
+        "MILK" : (30 - day) // 2, #could need to be changed
+        "WOOL" : (30 - day) // 3 #could need to be changed
+    }
+
+    empty_tiles = 0
+    for tile_row in my_tiles:
+        for tile in tile_row:
+            if tile == None:
+                empty_tiles += 1
+                continue
+            elif tile == "LOCKED":
+                continue
+            elif tile.get("kind") == "PLANT":
+                if tile.get("crop") == "WHEAT":
+                    projected_produced["WHEAT"] += max_harvest["WHEAT"]
+                elif tile.get("crop") == "CARROT":
+                    projected_produced["CARROT"] += max_harvest["CARROT"]
+                elif tile.get("crop") == "MELON":
+                    projected_produced["MELON"] += max_harvest["MELON"]
+                elif tile.get("crop") == "TOMATO":
+                    projected_produced["TOMATO"] += max_harvest["TOMATO"]
+                elif tile.get("crop") == "STRAWBERRY":
+                    projected_produced["STRAWBERRY"] += max_harvest["STRAWBERRY"]
+            elif tile.get("kind") == "WEED":
+                continue
+            elif tile.get("kind") == "COOP":
+                if tile.get("animal") == "GOOSE":
+                    projected_produced["EGG"] += max_harvest["EGG"] - ((day - tile.get("placed_day")) if day - tile.get("placed_day") < 4 else 0)
+            elif tile.get("kind") == "PASTURE":
+                if tile.get("animal") == "COW":
+                    projected_produced["MILK"] += max_harvest["MILK"] - ((day - tile.get("placed_day")) // 2 if day - tile.get("placed_day") < 8 else 0)
+                elif tile.get("animal") == "SHEEP":
+                    projected_produced["WOOL"] += max_harvest["WOOL"] - ((day - tile.get("placed_day")) // 3 if day - tile.get("placed_day") < 6 else 0)
+            else:
+                print('unexpected tile kind:', tile.get("kind"))
+                continue
+
+    demand_minus_supply = {
+        "WHEAT" : daily_demand["WHEAT"] - projected_produced["WHEAT"],
+        "CARROT" : daily_demand["CARROT"] - projected_produced["CARROT"],
+        "MELON" : daily_demand["MELON"] - projected_produced["MELON"],
+        "TOMATO" : daily_demand["TOMATO"] - projected_produced["TOMATO"],
+        "STRAWBERRY" : daily_demand["STRAWBERRY"] - projected_produced["STRAWBERRY"],
+        "EGG" : daily_demand["EGG"] - projected_produced["EGG"],
+        "MILK" : daily_demand["MILK"] - projected_produced["MILK"],
+        "WOOL" : daily_demand["WOOL"] - projected_produced["WOOL"]
+    }
+
+    projected_prices = {
+        "WHEAT" : prices["WHEAT"],
     }
 
     product_values = { #subtract value based on how many of that crop we have, later
@@ -92,26 +163,6 @@ def agent(obs):
             "MILK" : ((daily_demand["MILK"] + demand_EV_Day["MILK"] * (30 - day)) * prices["MILK"]) * (22 - day) / ((30 - day) if 30 - day > 0 else 1),
             "WOOL" : ((daily_demand["WOOL"] + demand_EV_Day["WOOL"] * (30 - day)) * prices["WOOL"]) * (24 - day) / ((30 - day) if 30 - day > 0 else 1)
         }
-        
-    empty_tiles = 0
-    for tile_row in tiles:
-        for tile in tile_row:
-            if tile == None:
-                empty_tiles += 1
-                continue
-            elif tile == "LOCKED":
-                continue
-            elif tile.get("kind") == "PLANT":
-                continue
-            elif tile.get("kind") == "WEED":
-                continue
-            elif tile.get("kind") == "COOP":
-                continue
-            elif tile.get("kind") == "PASTURE":
-                continue
-            else:
-                print('unexpected tile kind:', tile.get("kind"))
-                continue
             
     # 1. State Extraction & Tracking
     # Parse coordinates, tile statuses, cash, and shop multipliers
@@ -121,6 +172,8 @@ def agent(obs):
     market_orders = []
     # 2. Market Execution (Hourly / Daily triggers)
     # Buy seeds, sell ready produce, hire farm hands
+    if shed.get("WHEAT", 0) > 0:
+        market_orders.append(["SELL", "WHEAT", 1])
     if hour == 0:
         # e.g., buy seeds or hire hands at the start of a new day
         if len(my_farm["unlocked_quadrants"]) == 1:
@@ -153,7 +206,7 @@ def agent(obs):
                     current_x, current_y = farmer_pos
                 else:
                     current_x, current_y = hands_list[i - 1]
-                current_tile = my_farm["tiles"][current_y][current_x]
+                current_tile = my_tiles[current_y][current_x]
                 if i == 0:
                     if current_x != 0:
                         worker_actions.append(step_toward(farmer_pos, (0, 5)))

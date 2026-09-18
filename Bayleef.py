@@ -72,7 +72,7 @@ def agent(obs):
         else:
             print('something went wrong with shop:', shop)
 
-    demand_EV_Day = { #every time a shop opens, demand spikes by this much per day, fix this
+    demand_EV_Day = { #every time a shop opens, expected demand spikes by this much per day
         "WHEAT" : 3.75,
         "CARROT" : 2.25,
         "MELON" : 0,
@@ -138,7 +138,38 @@ def agent(obs):
                 print('unexpected tile kind:', tile.get("kind"))
                 continue
 
-    demand_minus_supply = {
+    for tile_row in opp_farm["tiles"]:
+        for tile in tile_row:
+            if tile == None:
+                continue
+            elif tile == "LOCKED":
+                continue
+            elif tile.get("kind") == "PLANT":
+                if tile.get("crop") == "WHEAT":
+                    projected_produced["WHEAT"] += max_harvest["WHEAT"]
+                elif tile.get("crop") == "CARROT":
+                    projected_produced["CARROT"] += max_harvest["CARROT"]
+                elif tile.get("crop") == "MELON":
+                    projected_produced["MELON"] += max_harvest["MELON"]
+                elif tile.get("crop") == "TOMATO":
+                    projected_produced["TOMATO"] += max_harvest["TOMATO"]
+                elif tile.get("crop") == "STRAWBERRY":
+                    projected_produced["STRAWBERRY"] += max_harvest["STRAWBERRY"]
+            elif tile.get("kind") == "WEED":
+                continue
+            elif tile.get("kind") == "COOP":
+                if tile.get("animal") == "GOOSE":
+                    projected_produced["EGG"] += max_harvest["EGG"] - ((day - tile.get("placed_day")) if day - tile.get("placed_day") < 4 else 0)
+            elif tile.get("kind") == "PASTURE":
+                if tile.get("animal") == "COW":
+                    projected_produced["MILK"] += max_harvest["MILK"] - ((day - tile.get("placed_day")) // 2 if day - tile.get("placed_day") < 8 else 0)
+                elif tile.get("animal") == "SHEEP":
+                    projected_produced["WOOL"] += max_harvest["WOOL"] - ((day - tile.get("placed_day")) // 3 if day - tile.get("placed_day") < 6 else 0)
+            else:
+                print('unexpected opp farm tile kind:', tile.get("kind"))
+                continue
+
+    current_demand_minus_projected_supply = {
         "WHEAT" : daily_demand["WHEAT"] - projected_produced["WHEAT"],
         "CARROT" : daily_demand["CARROT"] - projected_produced["CARROT"],
         "MELON" : daily_demand["MELON"] - projected_produced["MELON"],
@@ -147,6 +178,17 @@ def agent(obs):
         "EGG" : daily_demand["EGG"] - projected_produced["EGG"],
         "MILK" : daily_demand["MILK"] - projected_produced["MILK"],
         "WOOL" : daily_demand["WOOL"] - projected_produced["WOOL"]
+    }
+
+    projected_demand_increase = {
+        "WHEAT" : demand_EV_Day["WHEAT"],
+        "CARROT" : demand_EV_Day["CARROT"],
+        "MELON" : demand_EV_Day["MELON"],
+        "TOMATO" : demand_EV_Day["TOMATO"],
+        "STRAWBERRY" : demand_EV_Day["STRAWBERRY"],
+        "EGG" : demand_EV_Day["EGG"],
+        "MILK" : demand_EV_Day["MILK"],
+        "WOOL" : demand_EV_Day["WOOL"]
     }
 
     projected_prices = {

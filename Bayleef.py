@@ -148,11 +148,32 @@ def agent(obs):
         "MELON" : 6,
         "TOMATO" : 12,
         "STRAWBERRY" : 12,
-        "EGG" : 30 - day, #could need to be changed, this neglects the time for goose to mature
-        "MILK" : (30 - day) // 2, #could need to be changed
-        "WOOL" : (30 - day) // 3 #could need to be changed
+        "EGG" : 26 - day if day < 26 else 0,
+        "MILK" : (22 - day) // 2 if day < 22 else 0, 
+        "WOOL" : (24 - day) // 3 if day < 24 else 0
     }
 
+    product_lifespan = {
+            "WHEAT" : 4,
+            "CARROT" : 3,
+            "MELON" : 10,
+            "TOMATO" : 11,
+            "STRAWBERRY" : 16,
+            "EGG" : 30 - day,
+            "MILK" : 30 - day,
+            "WOOL" : 30 - day
+    }
+
+    seed_cost = {
+        "WHEAT" : 10,
+        "CARROT" : 20,
+        "MELON" : 80,
+        "TOMATO" : 50,
+        "STRAWBERRY" : 100,
+        "EGG" : 300,
+        "MILK" : 400,
+        "WOOL" : 500
+    }
     empty_tiles = 0
     for tile_row in my_tiles:
         for tile in tile_row:
@@ -282,15 +303,81 @@ def agent(obs):
         "WOOL" : obs["market"]["inventory"].get("WOOL", 0) - total_demand_minus_supply["WOOL"]
     }
 
+    base_costs = {
+        "WHEAT" : 25,
+        "CARROT" : 35,
+        "MELON" : 250,
+        "TOMATO" : 60,
+        "STRAWBERRY" : 120,
+        "EGG" : 50,
+        "MILK" : 160,
+        "WOOL" : 200
+    }
+
+    T_values = {
+        "WHEAT" : 400,
+        "CARROT" : 450,
+        "MELON" : 300,
+        "TOMATO" : 200,
+        "STRAWBERRY" : 100,
+        "EGG" : 332,
+        "MILK" : 122,
+        "WOOL" : 105
+    }
+
+    below_funcs = {
+        "WHEAT" : "sqrt",
+        "CARROT" : "hinge",
+        "MELON" : "log",
+        "TOMATO" : "hinge",
+        "STRAWBERRY" : "sqrt",
+        "EGG" : "hinge",
+        "MILK" : "sqrt",
+        "WOOL" : "log"
+    }
+
+    below_targets = {
+        "WHEAT" : 0.80,
+        "CARROT" : 1.00,
+        "MELON" : 0.20,
+        "TOMATO" : 0.40,
+        "STRAWBERRY" : 0.70,
+        "EGG" : 0.40,
+        "MILK" : 0.60,
+        "WOOL" : 0.20
+    }
+
+    above_funcs = {
+        "WHEAT" : "log",
+        "CARROT" : "sqrt",
+        "MELON" : "sq",
+        "TOMATO" : "sqrt",
+        "STRAWBERRY" : "linear",
+        "EGG" : "log",
+        "MILK" : "linear",
+        "WOOL" : "sq"
+    }
+
+    above_targets = {
+        "WHEAT" : 0.20,
+        "CARROT" : 0.70,
+        "MELON" : 3.6,
+        "TOMATO" : 0.60,
+        "STRAWBERRY" : 1.60,
+        "EGG" : 0.20,
+        "MILK" : 1.60,
+        "WOOL" : 3.20
+    }
+
     projected_prices = {
-        "WHEAT" : predict_price(projected_inventory["WHEAT"], 25, 400, "sqrt", 0.80, "log", 0.20),
-        "CARROT" : predict_price(projected_inventory["CARROT"], 35, 450, "hinge", 1, "sqrt", 0.70),
-        "MELON" : predict_price(projected_inventory["MELON"], 250, 300, "log", 0.20, "sq", 3.6),
-        "TOMATO" : predict_price(projected_inventory["TOMATO"], 60, 200, "hinge", 0.40, "sqrt", 0.60),
-        "STRAWBERRY" : predict_price(projected_inventory["STRAWBERRY"], 120, 100, "sqrt", 0.70, "linear", 1.60),
-        "EGG" : predict_price(projected_inventory["EGG"], 50, 332, "hinge", 0.40, "log", 0.20),
-        "MILK" : predict_price(projected_inventory["MILK"], 160, 122, "sqrt", 0.60, "linear", 1.60),
-        "WOOL" : predict_price(projected_inventory["WOOL"], 200, 105, "log", 0.20, "sq", 3.20)
+        "WHEAT" : predict_price(projected_inventory["WHEAT"], base_costs["WHEAT"], T_values["WHEAT"], below_funcs["WHEAT"], below_targets["WHEAT"], above_funcs["WHEAT"], above_targets["WHEAT"]),
+        "CARROT" : predict_price(projected_inventory["CARROT"], base_costs["CARROT"], T_values["CARROT"], below_funcs["CARROT"], below_targets["CARROT"], above_funcs["CARROT"], above_targets["CARROT"]),
+        "MELON" : predict_price(projected_inventory["MELON"], base_costs["MELON"], T_values["MELON"], below_funcs["MELON"], below_targets["MELON"], above_funcs["MELON"], above_targets["MELON"]),
+        "TOMATO" : predict_price(projected_inventory["TOMATO"], base_costs["TOMATO"], T_values["TOMATO"], below_funcs["TOMATO"], below_targets["TOMATO"], above_funcs["TOMATO"], above_targets["TOMATO"]),
+        "STRAWBERRY" : predict_price(projected_inventory["STRAWBERRY"], base_costs["STRAWBERRY"], T_values["STRAWBERRY"], below_funcs["STRAWBERRY"], below_targets["STRAWBERRY"], above_funcs["STRAWBERRY"], above_targets["STRAWBERRY"]),
+        "EGG" : predict_price(projected_inventory["EGG"], base_costs["EGG"], T_values["EGG"], below_funcs["EGG"], below_targets["EGG"], above_funcs["EGG"], above_targets["EGG"]),
+        "MILK" : predict_price(projected_inventory["MILK"], base_costs["MILK"], T_values["MILK"], below_funcs["MILK"], below_targets["MILK"], above_funcs["MILK"], above_targets["MILK"]),
+        "WOOL" : predict_price(projected_inventory["WOOL"], base_costs["WOOL"], T_values["WOOL"], below_funcs["WOOL"], below_targets["WOOL"], above_funcs["WOOL"], above_targets["WOOL"])
     }
 
     '''product_values = { #subtract value based on how many of that crop we have, later
@@ -303,17 +390,46 @@ def agent(obs):
             "MILK" : ((daily_demand["MILK"] + demand_EV_Day["MILK"] * (30 - day)) * prices["MILK"]) * (22 - day) / ((30 - day) if 30 - day > 0 else 1),
             "WOOL" : ((daily_demand["WOOL"] + demand_EV_Day["WOOL"] * (30 - day)) * prices["WOOL"]) * (24 - day) / ((30 - day) if 30 - day > 0 else 1)
         }'''
-    product_values = {
-        "WHEAT" : projected_prices["WHEAT"] * 6 / 4,
-        "CARROT" : projected_prices["CARROT"] * 4 / 3,
-        "MELON" : projected_prices["MELON"] * 6 / 10,
-        "TOMATO" : projected_prices["TOMATO"] * 16 / 11,
-        "STRAWBERRY" : projected_prices["STRAWBERRY"] * 16 / 16,
-        "EGG" : projected_prices["EGG"] * (26 - day) / (30 - day) if 26 - day > 0 else 0,
-        "MILK" : projected_prices["MILK"] * (22 - day) / (30 - day) if 22 - day > 0 else 0,
-        "WOOL" : projected_prices["WOOL"] * (24 - day) / (30 - day) if 24 - day > 0 else 0
+    product_revenue_per_day = {
+        "WHEAT" : projected_prices["WHEAT"] * max_harvest["WHEAT"] / product_lifespan["WHEAT"],
+        "CARROT" : projected_prices["CARROT"] * max_harvest["CARROT"] / product_lifespan["CARROT"],
+        "MELON" : projected_prices["MELON"] * max_harvest["MELON"] / product_lifespan["MELON"],
+        "TOMATO" : projected_prices["TOMATO"] * max_harvest["TOMATO"] / product_lifespan["TOMATO"],
+        "STRAWBERRY" : projected_prices["STRAWBERRY"] * max_harvest["STRAWBERRY"] / product_lifespan["STRAWBERRY"],
+        "EGG" : projected_prices["EGG"] * max_harvest["EGG"] / product_lifespan["EGG"] if 26 - day > 0 else 0,
+        "MILK" : projected_prices["MILK"] * max_harvest["MILK"] / product_lifespan["MILK"] if 22 - day > 0 else 0,
+        "WOOL" : projected_prices["WOOL"] * max_harvest["WOOL"] / product_lifespan["WOOL"] if 24 - day > 0 else 0
     }
-            
+
+    product_cost = { #add costs to buy feed and fertilizer later
+        "WHEAT" : seed_cost["WHEAT"],
+        "CARROT" : seed_cost["CARROT"],
+        "MELON" : seed_cost["MELON"],
+        "TOMATO" : seed_cost["TOMATO"],
+        "STRAWBERRY" : seed_cost["STRAWBERRY"],
+        "EGG" : seed_cost["EGG"],
+        "MILK" : seed_cost["MILK"],
+        "WOOL" : seed_cost["WOOL"]
+    }
+
+    product_values = {
+            "WHEAT" : product_revenue_per_day["WHEAT"] - product_cost["WHEAT"],
+            "CARROT" : product_revenue_per_day["CARROT"] - product_cost["CARROT"],
+            "MELON" : product_revenue_per_day["MELON"] - product_cost["MELON"],
+            "TOMATO" : product_revenue_per_day["TOMATO"] - product_cost["TOMATO"],
+            "STRAWBERRY" : product_revenue_per_day["STRAWBERRY"] - product_cost["STRAWBERRY"],
+            "EGG" : product_revenue_per_day["EGG"] - product_cost["EGG"],
+            "MILK" : product_revenue_per_day["MILK"] - product_cost["MILK"],
+            "WOOL" : product_revenue_per_day["WOOL"] - product_cost["WOOL"]
+        }
+
+    def update_value(product):
+        projected_inventory[product] += max_harvest[product]
+        projected_prices[product] = predict_price(projected_inventory[product], base_costs[product], T_values[product], below_funcs[product], below_targets[product], above_funcs[product], above_targets[product])
+        product_revenue_per_day[product] = projected_prices[product] * max_harvest[product] / product_lifespan[product] if product_lifespan[product] > 0 else 0
+        product_values[product] = product_revenue_per_day[product] - product_cost[product]
+
+    
     # 1. State Extraction & Tracking
     # Parse coordinates, tile statuses, cash, and shop multipliers
     farmer_pos = my_farm["farmer"]
@@ -356,44 +472,36 @@ def agent(obs):
                 current_max_value_product = max(zip(product_values.values(), product_values.keys()))[1]
                 if current_max_value_product == "WHEAT":
                     wheat_seed_wanted += 1
-                    start_money -= prices["WHEAT"]
-                    projected_prices["WHEAT"] = predict_price(projected_inventory["WHEAT"] + 6, 25, 400, "sqrt", 0.80, "log", 0.20)
-                    product_values["WHEAT"] = projected_prices["WHEAT"] * 6 / 4
+                    start_money -= product_cost["WHEAT"]
+                    update_value("WHEAT")
                 elif current_max_value_product == "CARROT":
                     carrot_seed_wanted += 1
-                    start_money -= prices["CARROT"]
-                    projected_prices["CARROT"] = predict_price(projected_inventory["CARROT"] + 4, 35, 450, "hinge", 1, "sqrt", 0.70)
-                    product_values["CARROT"] = projected_prices["CARROT"] * 4 / 3
+                    start_money -= product_cost["CARROT"]
+                    update_value("CARROT")
                 elif current_max_value_product == "MELON":
                     melon_seed_wanted += 1
-                    start_money -= prices["MELON"]
-                    projected_prices["MELON"] = predict_price(projected_inventory["MELON"] + 6, 250, 300, "log", 0.20, "sq", 3.6)
-                    product_values["MELON"] = projected_prices["MELON"] * 6 / 10,
+                    start_money -= product_cost["MELON"]
+                    update_value("MELON")
                 elif current_max_value_product == "TOMATO":
                     tomato_seed_wanted += 1
-                    start_money -= prices["TOMATO"]
-                    projected_prices["TOMATO"] = predict_price(projected_inventory["TOMATO"] + 16, 60, 200, "hinge", 0.40, "sqrt", 0.60)
-                    product_values["TOMATO"] = projected_prices["TOMATO"] * 16 / 11
+                    start_money -= product_cost["TOMATO"]
+                    update_value("TOMATO")
                 elif current_max_value_product == "STRAWBERRY":
                     strawberry_seed_wanted += 1
-                    start_money -= prices["STRAWBERRY"]
-                    projected_prices["STRAWBERRY"] = predict_price(projected_inventory["STRAWBERRY"] + 16, 120, 100, "sqrt", 0.70, "linear", 1.60)
-                    product_values["STRAWBERRY"] = projected_prices["STRAWBERRY"] * 16 / 16
+                    start_money -= product_cost["STRAWBERRY"]
+                    update_value("STRAWBERRY")
                 elif current_max_value_product == "EGG":
                     goose_wanted += 1
-                    start_money -= prices["EGG"]
-                    projected_prices["EGG"] = predict_price(projected_inventory["EGG"] + 26 - day, 50, 332, "hinge", 0.40, "log", 0.20)
-                    product_values["EGG"] = projected_prices["EGG"] * (26 - day) / (30 - day) if 26 - day > 0 else 0
+                    start_money -= product_cost["EGG"]
+                    update_value("EGG")
                 elif current_max_value_product == "MILK":
                     cow_wanted += 1
-                    start_money -= prices["MILK"]
-                    projected_prices["MILK"] = predict_price(projected_inventory["MILK"] + 22 - day, 160, 122, "sqrt", 0.60, "linear", 1.60)
-                    product_values["MILK"] = projected_prices["MILK"] * (22 - day) / (30 - day) if 22 - day > 0 else 0
+                    start_money -= product_cost["MILK"]
+                    update_value("MILK")
                 elif current_max_value_product == "WOOL":
                     sheep_wanted += 1
-                    start_money -= prices["WOOL"]
-                    projected_prices["WOOL"] = predict_price(projected_inventory["WOOL"] + 24 - day, 200, 105, "log", 0.20, "sq", 3.20)
-                    product_values["WOOL"] = projected_prices["WOOL"] * (24 - day) / (30 - day) if 24 - day > 0 else 0
+                    start_money -= product_cost["WOOL"]
+                    update_value("WOOL")
                 else:
                     print('something went wrong with current_max_value_product:', current_max_value_product)
                     break

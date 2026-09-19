@@ -352,32 +352,48 @@ def agent(obs):
             sheep_wanted = 0
             total_seeds_and_animals = seeds.get("WHEAT", 0) + seeds.get("CARROT", 0) + seeds.get("MELON", 0) + seeds.get("TOMATO", 0) + seeds.get("STRAWBERRY", 0) + shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0)
             start_money = my_farm["money"]
-            while total_seeds_and_animals < empty_tiles and start_money > 0:
+            while total_seeds_and_animals < empty_tiles and start_money > 0: #change so if a purchase goes lower than 0 it doesn't go through
                 current_max_value_product = max(zip(product_values.values(), product_values.keys()))[1]
                 if current_max_value_product == "WHEAT":
                     wheat_seed_wanted += 1
                     start_money -= prices["WHEAT"]
+                    projected_prices["WHEAT"] = predict_price(projected_inventory["WHEAT"] + 6, 25, 400, "sqrt", 0.80, "log", 0.20)
+                    product_values["WHEAT"] = projected_prices["WHEAT"] * 6 / 4
                 elif current_max_value_product == "CARROT":
                     carrot_seed_wanted += 1
                     start_money -= prices["CARROT"]
+                    projected_prices["CARROT"] = predict_price(projected_inventory["CARROT"] + 4, 35, 450, "hinge", 1, "sqrt", 0.70)
+                    product_values["CARROT"] = projected_prices["CARROT"] * 4 / 3
                 elif current_max_value_product == "MELON":
                     melon_seed_wanted += 1
                     start_money -= prices["MELON"]
+                    projected_prices["MELON"] = predict_price(projected_inventory["MELON"] + 6, 250, 300, "log", 0.20, "sq", 3.6)
+                    product_values["MELON"] = projected_prices["MELON"] * 6 / 10,
                 elif current_max_value_product == "TOMATO":
                     tomato_seed_wanted += 1
                     start_money -= prices["TOMATO"]
+                    projected_prices["TOMATO"] = predict_price(projected_inventory["TOMATO"] + 16, 60, 200, "hinge", 0.40, "sqrt", 0.60)
+                    product_values["TOMATO"] = projected_prices["TOMATO"] * 16 / 11
                 elif current_max_value_product == "STRAWBERRY":
                     strawberry_seed_wanted += 1
                     start_money -= prices["STRAWBERRY"]
+                    projected_prices["STRAWBERRY"] = predict_price(projected_inventory["STRAWBERRY"] + 16, 120, 100, "sqrt", 0.70, "linear", 1.60)
+                    product_values["STRAWBERRY"] = projected_prices["STRAWBERRY"] * 16 / 16
                 elif current_max_value_product == "EGG":
                     goose_wanted += 1
                     start_money -= prices["EGG"]
+                    projected_prices["EGG"] = predict_price(projected_inventory["EGG"] + 26 - day, 50, 332, "hinge", 0.40, "log", 0.20)
+                    product_values["EGG"] = projected_prices["EGG"] * (26 - day) / (30 - day) if 26 - day > 0 else 0
                 elif current_max_value_product == "MILK":
                     cow_wanted += 1
                     start_money -= prices["MILK"]
+                    projected_prices["MILK"] = predict_price(projected_inventory["MILK"] + 22 - day, 160, 122, "sqrt", 0.60, "linear", 1.60)
+                    product_values["MILK"] = projected_prices["MILK"] * (22 - day) / (30 - day) if 22 - day > 0 else 0
                 elif current_max_value_product == "WOOL":
                     sheep_wanted += 1
                     start_money -= prices["WOOL"]
+                    projected_prices["WOOL"] = predict_price(projected_inventory["WOOL"] + 24 - day, 200, 105, "log", 0.20, "sq", 3.20)
+                    product_values["WOOL"] = projected_prices["WOOL"] * (24 - day) / (30 - day) if 24 - day > 0 else 0
                 else:
                     print('something went wrong with current_max_value_product:', current_max_value_product)
                     break

@@ -149,8 +149,20 @@ def agent(obs):
         "WHEAT" : 6,
         "CARROT" : 4,
         "MELON" : 6,
-        "TOMATO" : 12,
-        "STRAWBERRY" : 12,
+        "TOMATO" : 8,
+        "STRAWBERRY" : 8,
+        "EGG" : 26 - day if day < 26 else 0,
+        "MILK" : (22 - day) // 2 if day < 22 else 0, 
+        "WOOL" : (24 - day) // 3 if day < 24 else 0,
+        "FERTILIZER" : 30 - day
+    }
+
+    projected_harvest = {
+        "WHEAT" : 4,
+        "CARROT" : 3,
+        "MELON" : 6,
+        "TOMATO" : 7,
+        "STRAWBERRY" : 8,
         "EGG" : 26 - day if day < 26 else 0,
         "MILK" : (22 - day) // 2 if day < 22 else 0, 
         "WOOL" : (24 - day) // 3 if day < 24 else 0,
@@ -189,31 +201,24 @@ def agent(obs):
                 continue
             elif tile.get("kind") == "PLANT":
                 if tile.get("crop") == "WHEAT":
-                    projected_produced["WHEAT"] += max_harvest["WHEAT"]
-                    if tile.get("fertilized_until_day") == -1:
-                        projected_produced["FERTILIZER"] -= 1
+                    projected_produced["WHEAT"] += projected_harvest["WHEAT"]
+                    #if tile.get("fertilized_until_day") == -1:
+                        #projected_produced["FERTILIZER"] -= 1
                 elif tile.get("crop") == "CARROT":
-                    projected_produced["CARROT"] += max_harvest["CARROT"]
-                    if tile.get("fertilized_until_day") == -1:
-                        projected_produced["FERTILIZER"] -= 1
+                    projected_produced["CARROT"] += projected_harvest["CARROT"]
+                    #if tile.get("fertilized_until_day") == -1:
+                        #projected_produced["FERTILIZER"] -= 1
                 elif tile.get("crop") == "MELON":
-                    projected_produced["MELON"] += max_harvest["MELON"]
+                    projected_produced["MELON"] += projected_harvest["MELON"]
                 elif tile.get("crop") == "TOMATO":
-                    projected_produced["TOMATO"] += max_harvest["TOMATO"]
+                    projected_produced["TOMATO"] += projected_harvest["TOMATO"]
                     is_fertilized_now = tile.get("fertilized_until_day", -1) >= day
                     if day - tile.get("planted_day") < 8:
-                        projected_produced["FERTILIZER"] -= 2
-                    elif day - tile.get("planted_day") == 8:
-                        if not is_fertilized_now:
-                            projected_produced["FERTILIZER"] -= 2
-                        else:
-                            projected_produced["FERTILIZER"] -= 1
-                    elif day - tile.get("planted_day") < 11:
                         projected_produced["FERTILIZER"] -= 1
-                    elif day - tile.get("planted_day") == 11 and not is_fertilized_now:
+                    elif day - tile.get("planted_day") == 8 and not is_fertilized_now:
                         projected_produced["FERTILIZER"] -= 1
                 elif tile.get("crop") == "STRAWBERRY":
-                    projected_produced["STRAWBERRY"] += max_harvest["STRAWBERRY"]
+                    projected_produced["STRAWBERRY"] += projected_harvest["STRAWBERRY"]
                     age = day - tile.get("planted_day", 0)
                     is_fertilized_now = tile.get("fertilized_until_day", -1) >= day
                     if age < 10:
@@ -233,15 +238,15 @@ def agent(obs):
                 continue
             elif tile.get("kind") == "COOP":
                 if tile.get("animal") == "GOOSE":
-                    projected_produced["EGG"] += max_harvest["EGG"] - ((day - tile.get("placed_day")) if day - tile.get("placed_day") < 4 else 0)
-                    projected_produced["FERTILIZER"] += max_harvest["FERTILIZER"]
+                    projected_produced["EGG"] += projected_harvest["EGG"] - ((day - tile.get("placed_day")) if day - tile.get("placed_day") < 4 else 0)
+                    projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
             elif tile.get("kind") == "PASTURE":
                 if tile.get("animal") == "COW":
-                    projected_produced["MILK"] += max_harvest["MILK"] - ((day - tile.get("placed_day")) // 2 if day - tile.get("placed_day") < 8 else 0)
-                    projected_produced["FERTILIZER"] += max_harvest["FERTILIZER"]
+                    projected_produced["MILK"] += projected_harvest["MILK"] - ((day - tile.get("placed_day")) // 2 if day - tile.get("placed_day") < 8 else 0)
+                    projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
                 elif tile.get("animal") == "SHEEP":
-                    projected_produced["WOOL"] += max_harvest["WOOL"] - ((day - tile.get("placed_day")) // 3 if day - tile.get("placed_day") < 6 else 0)
-                    projected_produced["FERTILIZER"] += max_harvest["FERTILIZER"]
+                    projected_produced["WOOL"] += projected_harvest["WOOL"] - ((day - tile.get("placed_day")) // 3 if day - tile.get("placed_day") < 6 else 0)
+                    projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
             else:
                 print('unexpected tile kind:', tile.get("kind"))
                 continue
@@ -254,28 +259,28 @@ def agent(obs):
                 continue
             elif tile.get("kind") == "PLANT":
                 if tile.get("crop") == "WHEAT":
-                    projected_produced["WHEAT"] += max_harvest["WHEAT"]
+                    projected_produced["WHEAT"] += projected_harvest["WHEAT"]
                 elif tile.get("crop") == "CARROT":
-                    projected_produced["CARROT"] += max_harvest["CARROT"]
+                    projected_produced["CARROT"] += projected_harvest["CARROT"]
                 elif tile.get("crop") == "MELON":
-                    projected_produced["MELON"] += max_harvest["MELON"]
+                    projected_produced["MELON"] += projected_harvest["MELON"]
                 elif tile.get("crop") == "TOMATO":
-                    projected_produced["TOMATO"] += max_harvest["TOMATO"]
+                    projected_produced["TOMATO"] += projected_harvest["TOMATO"]
                 elif tile.get("crop") == "STRAWBERRY":
-                    projected_produced["STRAWBERRY"] += max_harvest["STRAWBERRY"]
+                    projected_produced["STRAWBERRY"] += projected_harvest["STRAWBERRY"]
             elif tile.get("kind") == "WEED":
                 continue
             elif tile.get("kind") == "COOP":
                 if tile.get("animal") == "GOOSE":
-                    projected_produced["EGG"] += max_harvest["EGG"] - ((day - tile.get("placed_day")) if day - tile.get("placed_day") < 4 else 0)
-                    projected_produced["FERTILIZER"] += max_harvest["FERTILIZER"]
+                    projected_produced["EGG"] += projected_harvest["EGG"] - ((day - tile.get("placed_day")) if day - tile.get("placed_day") < 4 else 0)
+                    projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
             elif tile.get("kind") == "PASTURE":
                 if tile.get("animal") == "COW":
-                    projected_produced["MILK"] += max_harvest["MILK"] - ((day - tile.get("placed_day")) // 2 if day - tile.get("placed_day") < 8 else 0)
-                    projected_produced["FERTILIZER"] += max_harvest["FERTILIZER"]
+                    projected_produced["MILK"] += projected_harvest["MILK"] - ((day - tile.get("placed_day")) // 2 if day - tile.get("placed_day") < 8 else 0)
+                    projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
                 elif tile.get("animal") == "SHEEP":
-                    projected_produced["WOOL"] += max_harvest["WOOL"] - ((day - tile.get("placed_day")) // 3 if day - tile.get("placed_day") < 6 else 0)
-                    projected_produced["FERTILIZER"] += max_harvest["FERTILIZER"]
+                    projected_produced["WOOL"] += projected_harvest["WOOL"] - ((day - tile.get("placed_day")) // 3 if day - tile.get("placed_day") < 6 else 0)
+                    projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
             else:
                 print('unexpected opp farm tile kind:', tile.get("kind"))
                 continue
@@ -444,14 +449,14 @@ def agent(obs):
             "WOOL" : ((daily_demand["WOOL"] + demand_EV_Day["WOOL"] * (30 - day)) * prices["WOOL"]) * (24 - day) / ((30 - day) if 30 - day > 0 else 1)
         }'''
     product_revenue_per_day = {
-        "WHEAT" : projected_prices["WHEAT"] * max_harvest["WHEAT"] / product_lifespan["WHEAT"],
-        "CARROT" : projected_prices["CARROT"] * max_harvest["CARROT"] / product_lifespan["CARROT"],
-        "MELON" : projected_prices["MELON"] * max_harvest["MELON"] / product_lifespan["MELON"],
-        "TOMATO" : projected_prices["TOMATO"] * max_harvest["TOMATO"] / product_lifespan["TOMATO"],
-        "STRAWBERRY" : projected_prices["STRAWBERRY"] * max_harvest["STRAWBERRY"] / product_lifespan["STRAWBERRY"],
-        "EGG" : (projected_prices["EGG"] * max_harvest["EGG"] / product_lifespan["EGG"] if 26 - day > 0 else 0) + (projected_prices["FERTILIZER"] * max_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0),
-        "MILK" : projected_prices["MILK"] * max_harvest["MILK"] / product_lifespan["MILK"] if 22 - day > 0 else 0 + (projected_prices["FERTILIZER"] * max_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0),
-        "WOOL" : projected_prices["WOOL"] * max_harvest["WOOL"] / product_lifespan["WOOL"] if 24 - day > 0 else 0 + (projected_prices["FERTILIZER"] * max_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0)
+        "WHEAT" : projected_prices["WHEAT"] * projected_harvest["WHEAT"] / product_lifespan["WHEAT"],
+        "CARROT" : projected_prices["CARROT"] * projected_harvest["CARROT"] / product_lifespan["CARROT"],
+        "MELON" : projected_prices["MELON"] * projected_harvest["MELON"] / product_lifespan["MELON"],
+        "TOMATO" : projected_prices["TOMATO"] * projected_harvest["TOMATO"] / product_lifespan["TOMATO"],
+        "STRAWBERRY" : projected_prices["STRAWBERRY"] * projected_harvest["STRAWBERRY"] / product_lifespan["STRAWBERRY"],
+        "EGG" : (projected_prices["EGG"] * projected_harvest["EGG"] / product_lifespan["EGG"] if 26 - day > 0 else 0) + (projected_prices["FERTILIZER"] * projected_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0),
+        "MILK" : projected_prices["MILK"] * projected_harvest["MILK"] / product_lifespan["MILK"] if 22 - day > 0 else 0 + (projected_prices["FERTILIZER"] * projected_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0),
+        "WOOL" : projected_prices["WOOL"] * projected_harvest["WOOL"] / product_lifespan["WOOL"] if 24 - day > 0 else 0 + (projected_prices["FERTILIZER"] * projected_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0)
     }
 
     product_cost = {
@@ -486,11 +491,11 @@ def agent(obs):
             "MILK" : product_revenue_per_day["MILK"] - product_cost_per_day["MILK"],
             "WOOL" : product_revenue_per_day["WOOL"] - product_cost_per_day["WOOL"]
         }
-    print('product_values:', product_values)
+    #print('product_values:', product_values)
     def update_value(product):
-        projected_inventory[product] += max_harvest[product] #note: if the opponent has a competent model, they will also buy this crop. It is possible that this will have to be weighted so that the expected inventory is increased greater than if only i bought this product
+        projected_inventory[product] += projected_harvest[product] #note: if the opponent has a competent model, they will also buy this crop. It is possible that this will have to be weighted so that the expected inventory is increased greater than if only i bought this product
         projected_prices[product] = predict_price(projected_inventory[product], base_costs[product], T_values[product], below_funcs[product], below_targets[product], above_funcs[product], above_targets[product])
-        product_revenue_per_day[product] = projected_prices[product] * max_harvest[product] / product_lifespan[product] if product_lifespan[product] > 0 else 0
+        product_revenue_per_day[product] = projected_prices[product] * projected_harvest[product] / product_lifespan[product] if product_lifespan[product] > 0 else 0
         product_values[product] = product_revenue_per_day[product] - product_cost_per_day[product]
 
     
@@ -550,10 +555,12 @@ def agent(obs):
                 elif current_max_value_product == "TOMATO":
                     tomato_seed_wanted += 1
                     start_money -= product_cost["TOMATO"]
+                    start_money -= product_cost["FERTILIZER"]
                     update_value("TOMATO")
                 elif current_max_value_product == "STRAWBERRY":
                     strawberry_seed_wanted += 1
                     start_money -= product_cost["STRAWBERRY"]
+                    start_money -= product_cost["FERTILIZER"] * 2
                     update_value("STRAWBERRY")
                 elif current_max_value_product == "EGG":
                     goose_wanted += 1
@@ -587,6 +594,8 @@ def agent(obs):
                 market_orders.append(["BUY_ANIMAL", "COW", cow_wanted])
             if sheep_wanted > 0:
                 market_orders.append(["BUY_ANIMAL", "SHEEP", sheep_wanted])
+            if tomato_seed_wanted + strawberry_seed_wanted * 2 > 0:
+                market_orders.append(["BUY_PRODUCT", "FERTILIZER", tomato_seed_wanted + strawberry_seed_wanted * 2])
         if len(my_farm["unlocked_quadrants"]) == 1:
             for i in range(len(hands_list) + 1):
                 if i == 0:
@@ -661,7 +670,7 @@ def agent(obs):
                                     else:
                                         worker_actions.append(["PASS"])
                             elif current_tile.get("crop") == "MELON":
-                                if age >= bonus_day_start: #bonus window of carrot
+                                if age >= bonus_day_start: #bonus window of melon
                                     if not current_tile.get("watered_today"):
                                         worker_actions.append(["WATER"])
                                     elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
@@ -678,7 +687,49 @@ def agent(obs):
                                         worker_actions.append(["NORTH"])
                                     else:
                                         worker_actions.append(["PASS"])
-                                
+                            elif current_tile.get("crop") == "TOMATO":
+                                if age in {8, 9, 10, 11}: #bonus window of tomato
+                                    if not current_tile.get("watered_today"):
+                                        worker_actions.append(["WATER"])
+                                    elif age == 8 and current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price * 3:
+                                        worker_actions.append(["FERTILIZE"]) 
+                                    elif (age >= lifespan and current_tile.get("yield_units") > 0) or current_tile.get("yield_units") >= max_harvest_size:
+                                        worker_actions.append(["HARVEST"])
+                                    else:
+                                        if current_y > 0:
+                                            worker_actions.append(["NORTH"])
+                                        else:
+                                            worker_actions.append(["PASS"])
+                                else:
+                                    if current_y > 0:
+                                        worker_actions.append(["NORTH"])
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            elif current_tile.get("crop") == "STRAWBERRY":
+                                if age >= bonus_day_start: #bonus window of strawberry
+                                    if not current_tile.get("watered_today") and age < lifespan:
+                                        worker_actions.append(["WATER"])
+                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
+                                        worker_actions.append(["FERTILIZE"]) 
+                                    elif (age >= lifespan and current_tile.get("yield_units") > 0) or current_tile.get("yield_units") >= max_harvest_size:
+                                        worker_actions.append(["HARVEST"])
+                                    else:
+                                        if current_y > 0:
+                                            worker_actions.append(["NORTH"])
+                                        else:
+                                            worker_actions.append(["PASS"])
+                                else:
+                                    if current_y > 0:
+                                        worker_actions.append(["NORTH"])
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            else:
+                                print('unknown plant detected')
+                        elif current_tile.get("kind") == "COOP":
+                            if current_tile.get("animal") == "GOOSE":
+                                if not current_tile.get("fed_today"):
+                                    worker_actions.append(["FEED"])
+
                 else:
                     worker_actions.append(["PASS"])
             

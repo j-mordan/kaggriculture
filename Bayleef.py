@@ -449,38 +449,49 @@ def agent(obs):
         "MELON" : projected_prices["MELON"] * max_harvest["MELON"] / product_lifespan["MELON"],
         "TOMATO" : projected_prices["TOMATO"] * max_harvest["TOMATO"] / product_lifespan["TOMATO"],
         "STRAWBERRY" : projected_prices["STRAWBERRY"] * max_harvest["STRAWBERRY"] / product_lifespan["STRAWBERRY"],
-        "EGG" : projected_prices["EGG"] * max_harvest["EGG"] / product_lifespan["EGG"] if 26 - day > 0 else 0,
-        "MILK" : projected_prices["MILK"] * max_harvest["MILK"] / product_lifespan["MILK"] if 22 - day > 0 else 0,
-        "WOOL" : projected_prices["WOOL"] * max_harvest["WOOL"] / product_lifespan["WOOL"] if 24 - day > 0 else 0
+        "EGG" : (projected_prices["EGG"] * max_harvest["EGG"] / product_lifespan["EGG"] if 26 - day > 0 else 0) + (projected_prices["FERTILIZER"] * max_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0),
+        "MILK" : projected_prices["MILK"] * max_harvest["MILK"] / product_lifespan["MILK"] if 22 - day > 0 else 0 + (projected_prices["FERTILIZER"] * max_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0),
+        "WOOL" : projected_prices["WOOL"] * max_harvest["WOOL"] / product_lifespan["WOOL"] if 24 - day > 0 else 0 + (projected_prices["FERTILIZER"] * max_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0)
     }
 
-    product_cost = { #add costs to buy feed and fertilizer later
-        "WHEAT" : seed_cost["WHEAT"],
-        "CARROT" : seed_cost["CARROT"],
+    product_cost = {
+        "WHEAT" : seed_cost["WHEAT"] + prices["FERTILIZER"],
+        "CARROT" : seed_cost["CARROT"] + prices["FERTILIZER"],
         "MELON" : seed_cost["MELON"],
-        "TOMATO" : seed_cost["TOMATO"],
-        "STRAWBERRY" : seed_cost["STRAWBERRY"],
+        "TOMATO" : seed_cost["TOMATO"] + prices["FERTILIZER"] * 2,
+        "STRAWBERRY" : seed_cost["STRAWBERRY"] + prices["FERTILIZER"] * 2,
         "EGG" : seed_cost["EGG"],
         "MILK" : seed_cost["MILK"],
         "WOOL" : seed_cost["WOOL"]
     }
 
-    product_values = {
-            "WHEAT" : product_revenue_per_day["WHEAT"] - product_cost["WHEAT"],
-            "CARROT" : product_revenue_per_day["CARROT"] - product_cost["CARROT"],
-            "MELON" : product_revenue_per_day["MELON"] - product_cost["MELON"],
-            "TOMATO" : product_revenue_per_day["TOMATO"] - product_cost["TOMATO"],
-            "STRAWBERRY" : product_revenue_per_day["STRAWBERRY"] - product_cost["STRAWBERRY"],
-            "EGG" : product_revenue_per_day["EGG"] - product_cost["EGG"],
-            "MILK" : product_revenue_per_day["MILK"] - product_cost["MILK"],
-            "WOOL" : product_revenue_per_day["WOOL"] - product_cost["WOOL"]
-        }
+    product_cost_per_day = {
+        "WHEAT" : product_cost["WHEAT"] / product_lifespan["WHEAT"],
+        "CARROT" : product_cost["CARROT"] / product_lifespan["CARROT"],
+        "MELON" : product_cost["MELON"] / product_lifespan["MELON"],
+        "TOMATO" : product_cost["TOMATO"] / product_lifespan["TOMATO"],
+        "STRAWBERRY" : product_cost["STRAWBERRY"] / product_lifespan["STRAWBERRY"],
+        "EGG" : product_cost["EGG"] / product_lifespan["EGG"] if day < 30 else product_cost["EGG"],
+        "MILK" : product_cost["MILK"] / product_lifespan["MILK"] if day < 30 else product_cost["MILK"],
+        "WOOL" : product_cost["WOOL"] / product_lifespan["WOOL"] if day < 30 else product_cost["WOOL"]
+    }
 
+    product_values = {
+            "WHEAT" : product_revenue_per_day["WHEAT"] - product_cost_per_day["WHEAT"],
+            "CARROT" : product_revenue_per_day["CARROT"] - product_cost_per_day["CARROT"],
+            "MELON" : product_revenue_per_day["MELON"] - product_cost_per_day["MELON"],
+            "TOMATO" : product_revenue_per_day["TOMATO"] - product_cost_per_day["TOMATO"],
+            "STRAWBERRY" : product_revenue_per_day["STRAWBERRY"] - product_cost_per_day["STRAWBERRY"],
+            "EGG" : product_revenue_per_day["EGG"] - product_cost_per_day["EGG"],
+            "MILK" : product_revenue_per_day["MILK"] - product_cost_per_day["MILK"],
+            "WOOL" : product_revenue_per_day["WOOL"] - product_cost_per_day["WOOL"]
+        }
+    print('product_values:', product_values)
     def update_value(product):
-        projected_inventory[product] += max_harvest[product]
+        projected_inventory[product] += max_harvest[product] #note: if the opponent has a competent model, they will also buy this crop. It is possible that this will have to be weighted so that the expected inventory is increased greater than if only i bought this product
         projected_prices[product] = predict_price(projected_inventory[product], base_costs[product], T_values[product], below_funcs[product], below_targets[product], above_funcs[product], above_targets[product])
         product_revenue_per_day[product] = projected_prices[product] * max_harvest[product] / product_lifespan[product] if product_lifespan[product] > 0 else 0
-        product_values[product] = product_revenue_per_day[product] - product_cost[product]
+        product_values[product] = product_revenue_per_day[product] - product_cost_per_day[product]
 
     
     # 1. State Extraction & Tracking
@@ -588,25 +599,38 @@ def agent(obs):
                         worker_actions.append(step_toward(farmer_pos, (0, 5)))
                     else:
                         if current_tile == None:
-                            if "COW" in inventories[0] or "SHEEP" in inventories[0]:
+                            if seeds.get("WHEAT", 0) > 0:
+                                worker_actions.append(["PLANT", "WHEAT"])
+                            elif seeds.get("CARROT", 0) > 0:
+                                worker_actions.append(["PLANT", "CARROT"])
+                            elif seeds.get("TOMATO", 0) > 0:
+                                worker_actions.append(["PLANT", "TOMATO"])
+                            elif seeds.get("STRAWBERRY", 0) > 0:
+                                worker_actions.append(["PLANT", "STRAWBERRY"])
+                            elif seeds.get("MELON", 0) > 0:
+                                worker_actions.append(["PLANT", "MELON"])
+                            elif "COW" in inventories[0] or "SHEEP" in inventories[0]:
                                 worker_actions.append(["BUILD_PASTURE"])
                             elif "GOOSE" in inventories[0]:
                                 worker_actions.append(["BUILD_COOP"])
-                            elif seeds.get("WHEAT", 0) > 0:
-                                worker_actions.append(["PLANT", "WHEAT"])
                             else:
                                 worker_actions.append(["NORTH"])
 
                         elif current_tile.get("kind") == "PLANT":
+                            age = day - current_tile.get("planted_day")
+                            lifespan = product_lifespan[current_tile.get("crop")]
+                            bonus_day_start = math.ceil(lifespan / 2)
+                            max_harvest_size = max_harvest[current_tile.get("crop")]
+                            crop_price = prices[current_tile.get("crop")]
                             if current_tile.get("consecutive_unwatered") > 0 and not current_tile.get("watered_today"):
                                 worker_actions.append(["WATER"])
                             elif current_tile.get("crop") == "WHEAT":
-                                if day - current_tile.get("planted_day") >= 2: #bonus window of wheat
+                                if age >= bonus_day_start: #bonus window of wheat
                                     if not current_tile.get("watered_today"):
                                         worker_actions.append(["WATER"])
-                                    elif current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0:
+                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < 2 * crop_price:
                                         worker_actions.append(["FERTILIZE"])
-                                    elif day - current_tile.get("planted_day") >= 4 or current_tile.get("yield_units") >= 6:
+                                    elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
                                         worker_actions.append(["HARVEST"])
                                     else:
                                         if current_y > 0:
@@ -618,6 +642,43 @@ def agent(obs):
                                         worker_actions.append(["NORTH"])
                                     else:
                                         worker_actions.append(["PASS"])
+                            elif current_tile.get("crop") == "CARROT":
+                                if age >= bonus_day_start: #bonus window of carrot
+                                    if not current_tile.get("watered_today"):
+                                        worker_actions.append(["WATER"])
+                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
+                                        worker_actions.append(["FERTILIZE"]) 
+                                    elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
+                                        worker_actions.append(["HARVEST"])
+                                    else:
+                                        if current_y > 0:
+                                            worker_actions.append(["NORTH"])
+                                        else:
+                                            worker_actions.append(["PASS"])
+                                else:
+                                    if current_y > 0:
+                                        worker_actions.append(["NORTH"])
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            elif current_tile.get("crop") == "MELON":
+                                if age >= bonus_day_start: #bonus window of carrot
+                                    if not current_tile.get("watered_today"):
+                                        worker_actions.append(["WATER"])
+                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
+                                        worker_actions.append(["FERTILIZE"]) 
+                                    elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
+                                        worker_actions.append(["HARVEST"])
+                                    else:
+                                        if current_y > 0:
+                                            worker_actions.append(["NORTH"])
+                                        else:
+                                            worker_actions.append(["PASS"])
+                                else:
+                                    if current_y > 0:
+                                        worker_actions.append(["NORTH"])
+                                    else:
+                                        worker_actions.append(["PASS"])
+                                
                 else:
                     worker_actions.append(["PASS"])
             

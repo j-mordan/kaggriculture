@@ -509,6 +509,8 @@ def agent(obs):
     # Buy seeds, sell ready produce, hire farm hands
     if shed.get("WHEAT", 0) > 0:
         market_orders.append(["SELL", "WHEAT", 1])
+    if shed.get("MELON", 0) > 0:
+        market_orders.append(["SELL", "MELON", shed.get("MELON", 0)])
     if hour == 0:
         # e.g., buy seeds or hire hands at the start of a new day
         if len(my_farm["unlocked_quadrants"]) == 1:
@@ -555,12 +557,12 @@ def agent(obs):
                 elif current_max_value_product == "TOMATO":
                     tomato_seed_wanted += 1
                     start_money -= product_cost["TOMATO"]
-                    start_money -= product_cost["FERTILIZER"]
+                    start_money -= prices["FERTILIZER"]
                     update_value("TOMATO")
                 elif current_max_value_product == "STRAWBERRY":
                     strawberry_seed_wanted += 1
                     start_money -= product_cost["STRAWBERRY"]
-                    start_money -= product_cost["FERTILIZER"] * 2
+                    start_money -= prices["FERTILIZER"] * 2
                     update_value("STRAWBERRY")
                 elif current_max_value_product == "EGG":
                     goose_wanted += 1

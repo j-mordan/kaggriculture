@@ -149,11 +149,11 @@ def agent(obs):
         "WHEAT" : 6,
         "CARROT" : 4,
         "MELON" : 6,
-        "TOMATO" : 8,
-        "STRAWBERRY" : 8,
-        "EGG" : 26 - day if day < 26 else 0,
-        "MILK" : (22 - day) // 2 if day < 22 else 0, 
-        "WOOL" : (24 - day) // 3 if day < 24 else 0,
+        "TOMATO" : 4, #max held?
+        "STRAWBERRY" : 4,
+        "EGG" : 4,
+        "MILK" : 6, 
+        "WOOL" : 6,
         "FERTILIZER" : 30 - day
     }
 
@@ -163,9 +163,9 @@ def agent(obs):
         "MELON" : 6,
         "TOMATO" : 7,
         "STRAWBERRY" : 8,
-        "EGG" : 26 - day if day < 26 else 0,
-        "MILK" : (22 - day) // 2 if day < 22 else 0, 
-        "WOOL" : (24 - day) // 3 if day < 24 else 0,
+        "EGG" : 4 + 2 * (25 - day) if day < 25 else 0,
+        "MILK" : 6 + 3 * (21 - day) // 2 if day < 21 else 0, 
+        "WOOL" : 6 + 4 * (23 - day) // 3 if day < 23 else 0,
         "FERTILIZER" : 30 - day
     }
 
@@ -460,14 +460,14 @@ def agent(obs):
     }
 
     product_cost = {
-        "WHEAT" : seed_cost["WHEAT"] + prices["FERTILIZER"],
-        "CARROT" : seed_cost["CARROT"] + prices["FERTILIZER"],
+        "WHEAT" : seed_cost["WHEAT"],
+        "CARROT" : seed_cost["CARROT"],
         "MELON" : seed_cost["MELON"],
-        "TOMATO" : seed_cost["TOMATO"] + prices["FERTILIZER"] * 2,
+        "TOMATO" : seed_cost["TOMATO"] + prices["FERTILIZER"],
         "STRAWBERRY" : seed_cost["STRAWBERRY"] + prices["FERTILIZER"] * 2,
-        "EGG" : seed_cost["EGG"],
-        "MILK" : seed_cost["MILK"],
-        "WOOL" : seed_cost["WOOL"]
+        "EGG" : seed_cost["EGG"] + (prices["WHEAT"] * (29 - day) if day < 29 else 0),
+        "MILK" : seed_cost["MILK"] + (prices["WHEAT"] * (27 - day) if day < 27 else 0),
+        "WOOL" : seed_cost["WOOL"] + (prices["WHEAT"] * (29 - day) if day < 29 else 0)
     }
 
     product_cost_per_day = {
@@ -491,7 +491,7 @@ def agent(obs):
             "MILK" : product_revenue_per_day["MILK"] - product_cost_per_day["MILK"],
             "WOOL" : product_revenue_per_day["WOOL"] - product_cost_per_day["WOOL"]
         }
-    #print('product_values:', product_values)
+    print('product_values:', product_values)
     def update_value(product):
         projected_inventory[product] += projected_harvest[product] #note: if the opponent has a competent model, they will also buy this crop. It is possible that this will have to be weighted so that the expected inventory is increased greater than if only i bought this product
         projected_prices[product] = predict_price(projected_inventory[product], base_costs[product], T_values[product], below_funcs[product], below_targets[product], above_funcs[product], above_targets[product])
@@ -507,8 +507,8 @@ def agent(obs):
     market_orders = []
     # 2. Market Execution (Hourly / Daily triggers)
     # Buy seeds, sell ready produce, hire farm hands
-    if shed.get("WHEAT", 0) > 0:
-        market_orders.append(["SELL", "WHEAT", 1])
+    #if shed.get("WHEAT", 0) > 0:
+        #market_orders.append(["SELL", "WHEAT", 1])
     if shed.get("MELON", 0) > 0:
         market_orders.append(["SELL", "MELON", shed.get("MELON", 0)])
     if hour == 0:
@@ -542,6 +542,8 @@ def agent(obs):
             start_money = my_farm["money"]
             while total_seeds_and_animals < empty_tiles and start_money > 0: #change so if a purchase goes lower than 0 it doesn't go through
                 current_max_value_product = max(zip(product_values.values(), product_values.keys()))[1]
+                if product_cost[current_max_value_product] > start_money:
+                    
                 if current_max_value_product == "WHEAT":
                     wheat_seed_wanted += 1
                     start_money -= product_cost["WHEAT"]
@@ -557,24 +559,25 @@ def agent(obs):
                 elif current_max_value_product == "TOMATO":
                     tomato_seed_wanted += 1
                     start_money -= product_cost["TOMATO"]
-                    start_money -= prices["FERTILIZER"]
                     update_value("TOMATO")
                 elif current_max_value_product == "STRAWBERRY":
                     strawberry_seed_wanted += 1
                     start_money -= product_cost["STRAWBERRY"]
-                    start_money -= prices["FERTILIZER"] * 2
                     update_value("STRAWBERRY")
                 elif current_max_value_product == "EGG":
                     goose_wanted += 1
-                    start_money -= product_cost["EGG"]
+                    start_money -= seed_cost["EGG"]
+                    start_money -= 4 * prices["WHEAT"]
                     update_value("EGG")
                 elif current_max_value_product == "MILK":
                     cow_wanted += 1
-                    start_money -= product_cost["MILK"]
+                    start_money -= seed_cost["MILK"]
+                    start_money -= 4 * prices["WHEAT"]
                     update_value("MILK")
                 elif current_max_value_product == "WOOL":
                     sheep_wanted += 1
-                    start_money -= product_cost["WOOL"]
+                    start_money -= seed_cost["WOOL"]
+                    start_money -= 4 * prices["WHEAT"]
                     update_value("WOOL")
                 else:
                     print('something went wrong with current_max_value_product:', current_max_value_product)
@@ -598,6 +601,8 @@ def agent(obs):
                 market_orders.append(["BUY_ANIMAL", "SHEEP", sheep_wanted])
             if tomato_seed_wanted + strawberry_seed_wanted * 2 > 0:
                 market_orders.append(["BUY_PRODUCT", "FERTILIZER", tomato_seed_wanted + strawberry_seed_wanted * 2])
+            if goose_wanted + cow_wanted + sheep_wanted > 0:
+                market_orders.append(["BUY_PRODUCT", "WHEAT", 4 * (goose_wanted + cow_wanted + sheep_wanted)])
         if len(my_farm["unlocked_quadrants"]) == 1:
             for i in range(len(hands_list) + 1):
                 if i == 0:
@@ -727,11 +732,32 @@ def agent(obs):
                                         worker_actions.append(["PASS"])
                             else:
                                 print('unknown plant detected')
-                        elif current_tile.get("kind") == "COOP":
-                            if current_tile.get("animal") == "GOOSE":
-                                if not current_tile.get("fed_today"):
-                                    worker_actions.append(["FEED"])
-
+                        elif current_tile.get("kind") == "COOP" or current_tile.get("kind") == "PASTURE":
+                            if (current_tile.get("consecutive_unfed") == 1 or current_tile.get("cared_today")) and inventories[0].get("WHEAT", 0) > 0:
+                                worker_actions.append(["FEED"])
+                            elif current_tile.get("fertilizer_available"):
+                                worker_actions.append(["COLLECT_FERTILIZER"])
+                            elif current_tile.get("animal") == "GOOSE":
+                                if current_tile.get("yield_units") >= 4:
+                                    worker_actions.append(["HARVEST"])
+                                elif current_tile.get("pending_care_bonus") < 3:
+                                    worker_actions.append(["CARE"])
+                                elif current_tile.get("yield_units") > 0:
+                                    worker_actions.append(["HARVEST"])
+                            elif current_tile.get("animal") == "COW":
+                                if current_tile.get("yield_units") >= 6:
+                                    worker_actions.append(["HARVEST"])
+                                elif current_tile.get("pending_care_bonus") < 5:
+                                    worker_actions.append(["CARE"])
+                                elif current_tile.get("yield_units") > 0:
+                                    worker_actions.append(["HARVEST"])
+                            elif current_tile.get("animal") == "SHEEP":
+                                if current_tile.get("yield_units") >= 6:
+                                    worker_actions.append(["HARVEST"])
+                                elif current_tile.get("pending_care_bonus") < 5:
+                                    worker_actions.append(["CARE"])
+                                elif current_tile.get("yield_units") > 0:
+                                    worker_actions.append(["HARVEST"])
                 else:
                     worker_actions.append(["PASS"])
             

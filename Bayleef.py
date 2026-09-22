@@ -540,11 +540,20 @@ def agent(obs):
             sheep_wanted = 0
             total_seeds_and_animals = seeds.get("WHEAT", 0) + seeds.get("CARROT", 0) + seeds.get("MELON", 0) + seeds.get("TOMATO", 0) + seeds.get("STRAWBERRY", 0) + shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0)
             start_money = my_farm["money"]
-            while total_seeds_and_animals < empty_tiles and start_money > 0: #change so if a purchase goes lower than 0 it doesn't go through
-                current_max_value_product = max(zip(product_values.values(), product_values.keys()))[1]
-                if product_cost[current_max_value_product] > start_money:
-                    
-                if current_max_value_product == "WHEAT":
+            affordable = True
+            while total_seeds_and_animals < empty_tiles and affordable: #change so if a purchase goes lower than 0 it doesn't go through
+                sorted_products = sorted(
+                product_values.keys(), 
+                key=lambda p: product_values[p], 
+                reverse=True
+                )
+                current_max_value_product = next(
+                (p for p in sorted_products if product_cost[p] <= start_money), 
+                None  # fallback if nothing is affordable
+                )
+                if current_max_value_product == None:
+                    affordable == False
+                elif current_max_value_product == "WHEAT":
                     wheat_seed_wanted += 1
                     start_money -= product_cost["WHEAT"]
                     update_value("WHEAT")

@@ -230,6 +230,8 @@ def agent(obs):
         4: 4
     }
 
+    total_animals_both_farms = 0
+
     empty_tiles = 0
     for tile_row in my_tiles:
         for x, tile in enumerate(tile_row):
@@ -280,15 +282,18 @@ def agent(obs):
                 if tile.get("animal") == "GOOSE":
                     projected_produced["EGG"] += projected_harvest["EGG"] - ((day - tile.get("placed_day")) if day - tile.get("placed_day") < 4 else 0)
                     projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
+                    total_animals_both_farms += 1
                     animals_in_col[x] += 1
             elif tile.get("kind") == "PASTURE":
                 if tile.get("animal") == "COW":
                     projected_produced["MILK"] += projected_harvest["MILK"] - ((day - tile.get("placed_day")) // 2 if day - tile.get("placed_day") < 8 else 0)
                     projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
+                    total_animals_both_farms += 1
                     animals_in_col[x] += 1
                 elif tile.get("animal") == "SHEEP":
                     projected_produced["WOOL"] += projected_harvest["WOOL"] - ((day - tile.get("placed_day")) // 3 if day - tile.get("placed_day") < 6 else 0)
                     projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
+                    total_animals_both_farms += 1
                     animals_in_col[x] += 1
             else:
                 print('unexpected tile kind:', tile.get("kind"))
@@ -317,13 +322,16 @@ def agent(obs):
                 if tile.get("animal") == "GOOSE":
                     projected_produced["EGG"] += projected_harvest["EGG"] - ((day - tile.get("placed_day")) if day - tile.get("placed_day") < 4 else 0)
                     projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
+                    total_animals_both_farms += 1
             elif tile.get("kind") == "PASTURE":
                 if tile.get("animal") == "COW":
                     projected_produced["MILK"] += projected_harvest["MILK"] - ((day - tile.get("placed_day")) // 2 if day - tile.get("placed_day") < 8 else 0)
                     projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
+                    total_animals_both_farms += 1
                 elif tile.get("animal") == "SHEEP":
                     projected_produced["WOOL"] += projected_harvest["WOOL"] - ((day - tile.get("placed_day")) // 3 if day - tile.get("placed_day") < 6 else 0)
                     projected_produced["FERTILIZER"] += projected_harvest["FERTILIZER"]
+                    total_animals_both_farms += 1
             else:
                 print('unexpected opp farm tile kind:', tile.get("kind"))
                 continue
@@ -374,7 +382,7 @@ def agent(obs):
     }
 
     total_demand_minus_supply = {
-        "WHEAT" : current_demand_minus_projected_supply["WHEAT"] + projected_demand_increase["WHEAT"],
+        "WHEAT" : current_demand_minus_projected_supply["WHEAT"] + projected_demand_increase["WHEAT"] + 4 * total_animals_both_farms,
         "CARROT" : current_demand_minus_projected_supply["CARROT"] + projected_demand_increase["CARROT"],
         "MELON" : current_demand_minus_projected_supply["MELON"] + projected_demand_increase["MELON"],
         "TOMATO" : current_demand_minus_projected_supply["TOMATO"] + projected_demand_increase["TOMATO"],
@@ -569,6 +577,8 @@ def agent(obs):
         market_orders.append(["SELL", "MILK", shed.get("MILK", 0)])
     if shed.get("WOOL", 0) > 0:
         market_orders.append(["SELL", "WOOL", shed.get("WOOL", 0)])
+    if shed.get("FERTILIZER", 0) > 0:
+        market_orders.append(["SELL", "FERTILIZER", shed.get("FERTILIZER", 0)])
     if hour == 0:
         #print('product_values:', product_values)
         # e.g., buy seeds or hire hands at the start of a new day
@@ -673,7 +683,7 @@ def agent(obs):
         #market_orders.append(["BUY_SEED", "WHEAT", 10])
         current_x, current_y = farmer_pos
         if current_x != 0:
-            worker_actions.append(step_toward((current_x, current_y), (0, 4))) #why not move
+            worker_actions.append(["PASS"]) #why not move
 
     # 3. Task Selection & Route Execution
     # Determine what the farmer standing on (farmer_pos[0], farmer_pos[1]) needs to do
@@ -688,21 +698,28 @@ def agent(obs):
                 current_tile = my_tiles[current_y][current_x]
                 if current_x != farmer_col[i]:
                     if shed.get("GOOSE", 0) > 0 and empty_tiles_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                        worker_actions.append(["PICKUP", "GOOSE", min(empty_tiles_in_col[farmer_col[i]], shed.get("GOOSE", 0))])
-                        held_animals = min(empty_tiles_in_col[farmer_col[i]], shed.get("GOOSE", 0))
+                        worker_actions.append(["PICKUP", "GOOSE", min(2, empty_tiles_in_col[farmer_col[i]], shed.get("GOOSE", 0))])
+                        held_animals = min(2, empty_tiles_in_col[farmer_col[i]], shed.get("GOOSE", 0))
                     elif shed.get("COW", 0) > 0 and empty_tiles_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                        worker_actions.append(["PICKUP", "COW", min(empty_tiles_in_col[farmer_col[i]], shed.get("COW", 0))])
-                        held_animals = min(empty_tiles_in_col[farmer_col[i]], shed.get("COW", 0))
+                        worker_actions.append(["PICKUP", "COW", min(2, empty_tiles_in_col[farmer_col[i]], shed.get("COW", 0))])
+                        held_animals = min(2, empty_tiles_in_col[farmer_col[i]], shed.get("COW", 0))
                     elif shed.get("SHEEP", 0) > 0 and empty_tiles_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                        worker_actions.append(["PICKUP", "SHEEP", min(empty_tiles_in_col[farmer_col[i]], shed.get("SHEEP", 0))])
-                        held_animals = min(empty_tiles_in_col[farmer_col[i]], shed.get("SHEEP", 0))
+                        worker_actions.append(["PICKUP", "SHEEP", min(2, empty_tiles_in_col[farmer_col[i]], shed.get("SHEEP", 0))])
+                        held_animals = min(2, empty_tiles_in_col[farmer_col[i]], shed.get("SHEEP", 0))
                     if (current_x, current_y) in shed_adjacent_tiles and inventories[i].get("WHEAT", 0) < held_animals + animals_in_col[farmer_col[i]]:
                         worker_actions.append(["PICKUP", "WHEAT", held_animals + animals_in_col[farmer_col[i]] - inventories[i].get("WHEAT", 0)])
                     else:
                         worker_actions.append(step_toward((current_x, current_y), (farmer_col[i], 4)))
                 else:
                     if current_tile == None:
-                        if remaining_seeds.get("WHEAT", 0) > 0:
+                        if remaining_seeds.get("MELON", 0) > 0:
+                            worker_actions.append(["PLANT", "MELON"])
+                            remaining_seeds["MELON"] -= 1
+                        elif "COW" in inventories[i] or "SHEEP" in inventories[i]:
+                            worker_actions.append(["BUILD_PASTURE"])
+                        elif "GOOSE" in inventories[i]:
+                            worker_actions.append(["BUILD_COOP"])
+                        elif remaining_seeds.get("WHEAT", 0) > 0:
                             worker_actions.append(["PLANT", "WHEAT"])
                             remaining_seeds["WHEAT"] -= 1
                         elif remaining_seeds.get("CARROT", 0) > 0:
@@ -714,13 +731,6 @@ def agent(obs):
                         elif remaining_seeds.get("STRAWBERRY", 0) > 0:
                             worker_actions.append(["PLANT", "STRAWBERRY"])
                             remaining_seeds["STRAWBERRY"] -= 1
-                        elif remaining_seeds.get("MELON", 0) > 0:
-                            worker_actions.append(["PLANT", "MELON"])
-                            remaining_seeds["MELON"] -= 1
-                        elif "COW" in inventories[i] or "SHEEP" in inventories[i]:
-                            worker_actions.append(["BUILD_PASTURE"])
-                        elif "GOOSE" in inventories[i]:
-                            worker_actions.append(["BUILD_COOP"])
                         else:
                             worker_actions.append(["NORTH"])
                     elif current_tile == "LOCKED":

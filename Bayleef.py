@@ -427,11 +427,11 @@ def agent(obs):
     }
 
     projected_prices = {
-        "WHEAT" : predict_price(projected_inventory["WHEAT"], base_costs["WHEAT"], T_values["WHEAT"], below_funcs["WHEAT"], below_targets["WHEAT"], above_funcs["WHEAT"], above_targets["WHEAT"]),
-        "CARROT" : predict_price(projected_inventory["CARROT"], base_costs["CARROT"], T_values["CARROT"], below_funcs["CARROT"], below_targets["CARROT"], above_funcs["CARROT"], above_targets["CARROT"]),
-        "MELON" : predict_price(projected_inventory["MELON"], base_costs["MELON"], T_values["MELON"], below_funcs["MELON"], below_targets["MELON"], above_funcs["MELON"], above_targets["MELON"]),
-        "TOMATO" : predict_price(projected_inventory["TOMATO"], base_costs["TOMATO"], T_values["TOMATO"], below_funcs["TOMATO"], below_targets["TOMATO"], above_funcs["TOMATO"], above_targets["TOMATO"]),
-        "STRAWBERRY" : predict_price(projected_inventory["STRAWBERRY"], base_costs["STRAWBERRY"], T_values["STRAWBERRY"], below_funcs["STRAWBERRY"], below_targets["STRAWBERRY"], above_funcs["STRAWBERRY"], above_targets["STRAWBERRY"]),
+        "WHEAT" : predict_price(projected_inventory["WHEAT"], base_costs["WHEAT"], T_values["WHEAT"], below_funcs["WHEAT"], below_targets["WHEAT"], above_funcs["WHEAT"], above_targets["WHEAT"]) if day < 30 - product_lifespan["WHEAT"] else 0,
+        "CARROT" : predict_price(projected_inventory["CARROT"], base_costs["CARROT"], T_values["CARROT"], below_funcs["CARROT"], below_targets["CARROT"], above_funcs["CARROT"], above_targets["CARROT"]) if day < 30 - product_lifespan["CARROT"] else 0,
+        "MELON" : predict_price(projected_inventory["MELON"], base_costs["MELON"], T_values["MELON"], below_funcs["MELON"], below_targets["MELON"], above_funcs["MELON"], above_targets["MELON"]) if day < 30 - product_lifespan["MELON"] else 0,
+        "TOMATO" : predict_price(projected_inventory["TOMATO"], base_costs["TOMATO"], T_values["TOMATO"], below_funcs["TOMATO"], below_targets["TOMATO"], above_funcs["TOMATO"], above_targets["TOMATO"]) if day < 30 - product_lifespan["TOMATO"] else 0,
+        "STRAWBERRY" : predict_price(projected_inventory["STRAWBERRY"], base_costs["STRAWBERRY"], T_values["STRAWBERRY"], below_funcs["STRAWBERRY"], below_targets["STRAWBERRY"], above_funcs["STRAWBERRY"], above_targets["STRAWBERRY"]) if day < 30 - product_lifespan["STRAWBERRY"] else 0,
         "EGG" : predict_price(projected_inventory["EGG"], base_costs["EGG"], T_values["EGG"], below_funcs["EGG"], below_targets["EGG"], above_funcs["EGG"], above_targets["EGG"]),
         "MILK" : predict_price(projected_inventory["MILK"], base_costs["MILK"], T_values["MILK"], below_funcs["MILK"], below_targets["MILK"], above_funcs["MILK"], above_targets["MILK"]),
         "WOOL" : predict_price(projected_inventory["WOOL"], base_costs["WOOL"], T_values["WOOL"], below_funcs["WOOL"], below_targets["WOOL"], above_funcs["WOOL"], above_targets["WOOL"]),
@@ -509,9 +509,22 @@ def agent(obs):
     # Buy seeds, sell ready produce, hire farm hands
     #if shed.get("WHEAT", 0) > 0:
         #market_orders.append(["SELL", "WHEAT", 1])
+    if shed.get("CARROT", 0) > 0:
+        market_orders.append(["SELL", "CARROT", shed.get("CARROT", 0)])
     if shed.get("MELON", 0) > 0:
         market_orders.append(["SELL", "MELON", shed.get("MELON", 0)])
+    if shed.get("TOMATO", 0) > 0:
+        market_orders.append(["SELL", "TOMATO", shed.get("TOMATO", 0)])
+    if shed.get("STRAWBERRY", 0) > 0:
+        market_orders.append(["SELL", "STRAWBERRY", shed.get("STRAWBERRY", 0)])
+    if shed.get("EGG", 0) > 0:
+        market_orders.append(["SELL", "EGG", shed.get("EGG", 0)])
+    if shed.get("MILK", 0) > 0:
+        market_orders.append(["SELL", "MILK", shed.get("MILK", 0)])
+    if shed.get("WOOL", 0) > 0:
+        market_orders.append(["SELL", "WOOL", shed.get("WOOL", 0)])
     if hour == 0:
+        #print('product_values:', product_values)
         # e.g., buy seeds or hire hands at the start of a new day
         if len(my_farm["unlocked_quadrants"]) == 1:
             for i in range(5):
@@ -742,7 +755,15 @@ def agent(obs):
                             else:
                                 print('unknown plant detected')
                         elif current_tile.get("kind") == "COOP" or current_tile.get("kind") == "PASTURE":
-                            if (current_tile.get("consecutive_unfed") == 1 or current_tile.get("cared_today")) and inventories[0].get("WHEAT", 0) > 0:
+                            if current_tile.get("animal") == None and current_tile.get("kind") == "PASTURE":
+                                if inventories[0].get("COW", 0) > 0:
+                                    worker_actions.append(["PLACE", "COW"])
+                                elif inventories[0].get("SHEEP", 0) > 0:
+                                    worker_actions.append(["PLACE", "SHEEP"])
+                            elif current_tile.get("animal") == None and current_tile.get("kind") == "COOP":
+                                if inventories[0].get("GOOSE", 0) > 0:
+                                    worker_actions.append(["PLACE", "GOOSE"])
+                            elif (current_tile.get("consecutive_unfed") == 1 or current_tile.get("cared_today")) and inventories[0].get("WHEAT", 0) > 0:
                                 worker_actions.append(["FEED"])
                             elif current_tile.get("fertilizer_available"):
                                 worker_actions.append(["COLLECT_FERTILIZER"])
@@ -767,6 +788,8 @@ def agent(obs):
                                     worker_actions.append(["CARE"])
                                 elif current_tile.get("yield_units") > 0:
                                     worker_actions.append(["HARVEST"])
+                        elif current_tile.get("kind") == "WEED":
+                            worker_actions.append(["DIG"])
                 else:
                     worker_actions.append(["PASS"])
             

@@ -545,6 +545,90 @@ def agent(obs):
         if len(my_farm["unlocked_quadrants"]) == 1:
             for i in range(4):
                 market_orders.append(["HIRE"])
+        #move this to hour 0 since theres prob less than 10 orders
+        fertilizer_wanted = 0
+        wheat_seed_wanted = 0
+        carrot_seed_wanted = 0
+        melon_seed_wanted = 0
+        tomato_seed_wanted = 0
+        strawberry_seed_wanted = 0
+        goose_wanted = 0
+        cow_wanted = 0
+        sheep_wanted = 0
+        total_seeds_and_animals = seeds.get("WHEAT", 0) + seeds.get("CARROT", 0) + seeds.get("MELON", 0) + seeds.get("TOMATO", 0) + seeds.get("STRAWBERRY", 0) + shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0)
+        start_money = my_farm["money"]
+        affordable = True
+        while total_seeds_and_animals < empty_tiles and affordable: #change so if a purchase goes lower than 0 it doesn't go through
+            sorted_products = sorted(
+            product_values.keys(), 
+            key=lambda p: product_values[p], 
+            reverse=True
+            )
+            current_max_value_product = next(
+            (p for p in sorted_products if product_cost[p] <= start_money - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 7), 
+            None  # fallback if nothing is affordable, add to this for plants about to be harvested
+            )
+            if current_max_value_product == None:
+                affordable == False
+            elif current_max_value_product == "WHEAT":
+                wheat_seed_wanted += 1
+                start_money -= product_cost["WHEAT"]
+                update_value("WHEAT")
+            elif current_max_value_product == "CARROT":
+                carrot_seed_wanted += 1
+                start_money -= product_cost["CARROT"]
+                update_value("CARROT")
+            elif current_max_value_product == "MELON":
+                melon_seed_wanted += 1
+                start_money -= product_cost["MELON"]
+                update_value("MELON")
+            elif current_max_value_product == "TOMATO":
+                tomato_seed_wanted += 1
+                start_money -= product_cost["TOMATO"]
+                update_value("TOMATO")
+            elif current_max_value_product == "STRAWBERRY":
+                strawberry_seed_wanted += 1
+                start_money -= product_cost["STRAWBERRY"]
+                update_value("STRAWBERRY")
+            elif current_max_value_product == "EGG":
+                goose_wanted += 1
+                start_money -= seed_cost["EGG"]
+                start_money -= 4 * prices["WHEAT"]
+                update_value("EGG")
+            elif current_max_value_product == "MILK":
+                cow_wanted += 1
+                start_money -= seed_cost["MILK"]
+                start_money -= 4 * prices["WHEAT"]
+                update_value("MILK")
+            elif current_max_value_product == "WOOL":
+                sheep_wanted += 1
+                start_money -= seed_cost["WOOL"]
+                start_money -= 4 * prices["WHEAT"]
+                update_value("WOOL")
+            else:
+                print('something went wrong with current_max_value_product:', current_max_value_product)
+                break
+            total_seeds_and_animals += 1
+        if wheat_seed_wanted > 0:
+            market_orders.append(["BUY_SEED", "WHEAT", wheat_seed_wanted])
+        if carrot_seed_wanted > 0:
+            market_orders.append(["BUY_SEED", "CARROT", carrot_seed_wanted])
+        if melon_seed_wanted > 0:
+            market_orders.append(["BUY_SEED", "MELON", melon_seed_wanted])
+        if tomato_seed_wanted > 0:
+            market_orders.append(["BUY_SEED", "TOMATO", tomato_seed_wanted])
+        if strawberry_seed_wanted > 0:
+            market_orders.append(["BUY_SEED", "STRAWBERRY", strawberry_seed_wanted])
+        if goose_wanted > 0:
+            market_orders.append(["BUY_ANIMAL", "GOOSE", goose_wanted])
+        if cow_wanted > 0:
+            market_orders.append(["BUY_ANIMAL", "COW", cow_wanted])
+        if sheep_wanted > 0:
+            market_orders.append(["BUY_ANIMAL", "SHEEP", sheep_wanted])
+        if tomato_seed_wanted + strawberry_seed_wanted * 2 > 0:
+            market_orders.append(["BUY_PRODUCT", "FERTILIZER", tomato_seed_wanted + strawberry_seed_wanted * 2])
+        if goose_wanted + cow_wanted + sheep_wanted > 0:
+            market_orders.append(["BUY_PRODUCT", "WHEAT", 4 * (goose_wanted + cow_wanted + sheep_wanted)])
         #if day == 0:
             #product_values["MELON"] += 100
             #if my_farm["money"] >= 200 and seeds.get("MELON", 0) < 5:
@@ -552,95 +636,11 @@ def agent(obs):
         
 
         #market_orders.append(["BUY_SEED", "WHEAT", 10])
-        worker_actions.append(["PASS"]) #why not move
+        worker_actions.append(["P"]) #why not move
 
     # 3. Task Selection & Route Execution
     # Determine what the farmer standing on (farmer_pos[0], farmer_pos[1]) needs to do
-    elif hour < 24:
-        if hour == 1:
-            fertilizer_wanted = 0
-            wheat_seed_wanted = 0
-            carrot_seed_wanted = 0
-            melon_seed_wanted = 0
-            tomato_seed_wanted = 0
-            strawberry_seed_wanted = 0
-            goose_wanted = 0
-            cow_wanted = 0
-            sheep_wanted = 0
-            total_seeds_and_animals = seeds.get("WHEAT", 0) + seeds.get("CARROT", 0) + seeds.get("MELON", 0) + seeds.get("TOMATO", 0) + seeds.get("STRAWBERRY", 0) + shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0)
-            start_money = my_farm["money"]
-            affordable = True
-            while total_seeds_and_animals < empty_tiles and affordable: #change so if a purchase goes lower than 0 it doesn't go through
-                sorted_products = sorted(
-                product_values.keys(), 
-                key=lambda p: product_values[p], 
-                reverse=True
-                )
-                current_max_value_product = next(
-                (p for p in sorted_products if product_cost[p] <= start_money - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 7), 
-                None  # fallback if nothing is affordable
-                )
-                if current_max_value_product == None:
-                    affordable == False
-                elif current_max_value_product == "WHEAT":
-                    wheat_seed_wanted += 1
-                    start_money -= product_cost["WHEAT"]
-                    update_value("WHEAT")
-                elif current_max_value_product == "CARROT":
-                    carrot_seed_wanted += 1
-                    start_money -= product_cost["CARROT"]
-                    update_value("CARROT")
-                elif current_max_value_product == "MELON":
-                    melon_seed_wanted += 1
-                    start_money -= product_cost["MELON"]
-                    update_value("MELON")
-                elif current_max_value_product == "TOMATO":
-                    tomato_seed_wanted += 1
-                    start_money -= product_cost["TOMATO"]
-                    update_value("TOMATO")
-                elif current_max_value_product == "STRAWBERRY":
-                    strawberry_seed_wanted += 1
-                    start_money -= product_cost["STRAWBERRY"]
-                    update_value("STRAWBERRY")
-                elif current_max_value_product == "EGG":
-                    goose_wanted += 1
-                    start_money -= seed_cost["EGG"]
-                    start_money -= 4 * prices["WHEAT"]
-                    update_value("EGG")
-                elif current_max_value_product == "MILK":
-                    cow_wanted += 1
-                    start_money -= seed_cost["MILK"]
-                    start_money -= 4 * prices["WHEAT"]
-                    update_value("MILK")
-                elif current_max_value_product == "WOOL":
-                    sheep_wanted += 1
-                    start_money -= seed_cost["WOOL"]
-                    start_money -= 4 * prices["WHEAT"]
-                    update_value("WOOL")
-                else:
-                    print('something went wrong with current_max_value_product:', current_max_value_product)
-                    break
-                total_seeds_and_animals += 1
-            if wheat_seed_wanted > 0:
-                market_orders.append(["BUY_SEED", "WHEAT", wheat_seed_wanted])
-            if carrot_seed_wanted > 0:
-                market_orders.append(["BUY_SEED", "CARROT", carrot_seed_wanted])
-            if melon_seed_wanted > 0:
-                market_orders.append(["BUY_SEED", "MELON", melon_seed_wanted])
-            if tomato_seed_wanted > 0:
-                market_orders.append(["BUY_SEED", "TOMATO", tomato_seed_wanted])
-            if strawberry_seed_wanted > 0:
-                market_orders.append(["BUY_SEED", "STRAWBERRY", strawberry_seed_wanted])
-            if goose_wanted > 0:
-                market_orders.append(["BUY_ANIMAL", "GOOSE", goose_wanted])
-            if cow_wanted > 0:
-                market_orders.append(["BUY_ANIMAL", "COW", cow_wanted])
-            if sheep_wanted > 0:
-                market_orders.append(["BUY_ANIMAL", "SHEEP", sheep_wanted])
-            if tomato_seed_wanted + strawberry_seed_wanted * 2 > 0:
-                market_orders.append(["BUY_PRODUCT", "FERTILIZER", tomato_seed_wanted + strawberry_seed_wanted * 2])
-            if goose_wanted + cow_wanted + sheep_wanted > 0:
-                market_orders.append(["BUY_PRODUCT", "WHEAT", 4 * (goose_wanted + cow_wanted + sheep_wanted)])
+    elif hour < 24:    
         if len(my_farm["unlocked_quadrants"]) == 1:
             for i in range(len(hands_list) + 1):
                 if i == 0:

@@ -226,8 +226,8 @@ def agent(obs):
         0: 0,
         1: 1,
         2: 3,
-        3: 2,
-        4: 4
+        3: 4,
+        4: 2
     }
 
     total_animals_both_farms = 0

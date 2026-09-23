@@ -92,6 +92,8 @@ def agent(obs):
         10: 88
     }
 
+    shed_adjacent_tiles = [(4,4), (5,4), (4,5), (5,5)]
+
     daily_demand = { #default
         "WHEAT" : 1,
         "CARROT" : 1,
@@ -636,7 +638,9 @@ def agent(obs):
         
 
         #market_orders.append(["BUY_SEED", "WHEAT", 10])
-        worker_actions.append(["P"]) #why not move
+        current_x, current_y = farmer_pos
+        if current_x != 0:
+            worker_actions.append(step_toward((current_x, current_y), (0, 4))) #why not move
 
     # 3. Task Selection & Route Execution
     # Determine what the farmer standing on (farmer_pos[0], farmer_pos[1]) needs to do
@@ -649,15 +653,50 @@ def agent(obs):
                     current_x, current_y = hands_list[i - 1]
                 current_tile = my_tiles[current_y][current_x]
                 if i == 0 and current_x != 0:
-                    worker_actions.append(step_toward((current_x, current_y), (0, 4)))
-                elif i == 1 and current_x != 2:
-                    worker_actions.append(step_toward((current_x, current_y), (2, 4)))
+                    if shed.get("GOOSE", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "GOOSE", 1])
+                    elif shed.get("COW", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "COW", 1])
+                    elif shed.get("SHEEP", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "SHEEP", 1])
+                    else:
+                        worker_actions.append(step_toward((current_x, current_y), (0, 4)))
+                elif i == 1 and current_x != 1:
+                    if shed.get("GOOSE", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "GOOSE", 1])
+                    elif shed.get("COW", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "COW", 1])
+                    elif shed.get("SHEEP", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "SHEEP", 1])
+                    else:
+                        worker_actions.append(step_toward((current_x, current_y), (1, 4)))
                 elif i == 2 and current_x != 3:
-                    worker_actions.append(step_toward((current_x, current_y), (3, 4)))
-                elif i == 3 and current_x != 4:
-                    worker_actions.append(step_toward((current_x, current_y), (4, 4)))
-                elif i == 4 and current_x != 1:
-                    worker_actions.append(step_toward((current_x, current_y), (1, 4)))
+                    if shed.get("GOOSE", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "GOOSE", 1])
+                    elif shed.get("COW", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "COW", 1])
+                    elif shed.get("SHEEP", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "SHEEP", 1])
+                    else:
+                        worker_actions.append(step_toward((current_x, current_y), (3, 4)))
+                elif i == 3 and current_x != 2:
+                    if shed.get("GOOSE", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "GOOSE", 1])
+                    elif shed.get("COW", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "COW", 1])
+                    elif shed.get("SHEEP", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "SHEEP", 1])
+                    else:
+                        worker_actions.append(step_toward((current_x, current_y), (2, 4)))
+                elif i == 4 and current_x != 4:
+                    if shed.get("GOOSE", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "GOOSE", 1])
+                    elif shed.get("COW", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "COW", 1])
+                    elif shed.get("SHEEP", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "SHEEP", 1])
+                    else:
+                        worker_actions.append(step_toward((current_x, current_y), (4, 4)))
                 else:
                     if current_tile == None:
                         if remaining_seeds.get("WHEAT", 0) > 0:
@@ -794,29 +833,45 @@ def agent(obs):
                                 worker_actions.append(["PLACE", "GOOSE"])
                         elif (current_tile.get("consecutive_unfed") == 1 or current_tile.get("cared_today")) and inventories[i].get("WHEAT", 0) > 0:
                             worker_actions.append(["FEED"])
+                            print('feed')
                         elif current_tile.get("fertilizer_available"):
                             worker_actions.append(["COLLECT_FERTILIZER"])
                         elif current_tile.get("animal") == "GOOSE":
                             if current_tile.get("yield_units") >= 4:
                                 worker_actions.append(["HARVEST"])
-                            elif current_tile.get("pending_care_bonus") < 3:
+                            elif current_tile.get("pending_care_bonus") < 3 and not current_tile.get("cared_today"):
                                 worker_actions.append(["CARE"])
                             elif current_tile.get("yield_units") > 0:
                                 worker_actions.append(["HARVEST"])
+                            else:
+                                if current_y > 0:
+                                    worker_actions.append(["NORTH"])
+                                else:
+                                    worker_actions.append(["PASS"])
                         elif current_tile.get("animal") == "COW":
                             if current_tile.get("yield_units") >= 6:
                                 worker_actions.append(["HARVEST"])
-                            elif current_tile.get("pending_care_bonus") < 5:
+                            elif current_tile.get("pending_care_bonus") < 5 and not current_tile.get("cared_today"):
                                 worker_actions.append(["CARE"])
                             elif current_tile.get("yield_units") > 0:
                                 worker_actions.append(["HARVEST"])
+                            else:
+                                if current_y > 0:
+                                    worker_actions.append(["NORTH"])
+                                else:
+                                    worker_actions.append(["PASS"])
                         elif current_tile.get("animal") == "SHEEP":
                             if current_tile.get("yield_units") >= 6:
                                 worker_actions.append(["HARVEST"])
-                            elif current_tile.get("pending_care_bonus") < 5:
+                            elif current_tile.get("pending_care_bonus") < 5 and not current_tile.get("cared_today"):
                                 worker_actions.append(["CARE"])
                             elif current_tile.get("yield_units") > 0:
                                 worker_actions.append(["HARVEST"])
+                            else:
+                                if current_y > 0:
+                                    worker_actions.append(["NORTH"])
+                                else:
+                                    worker_actions.append(["PASS"])
                     elif current_tile.get("kind") == "WEED":
                         worker_actions.append(["DIG"])
             
@@ -836,7 +891,7 @@ def agent(obs):
 
     # 4. Return commands to the engine
     # (Matches the competition's submission API schema)
-    print(worker_actions)
+    #print(worker_actions)
     return {
         "farmer": worker_actions[0] if worker_actions else "PASS",
         "hands": [] if len(worker_actions) < 2  else worker_actions[1:],

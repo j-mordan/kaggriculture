@@ -2,7 +2,7 @@ def agent(obs):
     worker_actions = []
     market_orders = []
     if obs.get("hour") == 0:
-        for i in range(3):
+        for i in range(9):
             market_orders.append(["HIRE"])
     return {
             "farmer": worker_actions[0] if worker_actions else "PASS",

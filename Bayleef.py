@@ -82,7 +82,14 @@ def agent(obs):
     cost_of_n_farmers = {
         1 : 0,
         2 : 1,
-        3: 2
+        3: 2,
+        4: 4,
+        5: 7,
+        6: 12,
+        7: 20,
+        8: 33,
+        9: 54,
+        10: 88
     }
 
     daily_demand = { #default
@@ -536,7 +543,7 @@ def agent(obs):
         #print('product_values:', product_values)
         # e.g., buy seeds or hire hands at the start of a new day
         if len(my_farm["unlocked_quadrants"]) == 1:
-            for i in range(5):
+            for i in range(4):
                 market_orders.append(["HIRE"])
         #if day == 0:
             #product_values["MELON"] += 100
@@ -570,7 +577,7 @@ def agent(obs):
                 reverse=True
                 )
                 current_max_value_product = next(
-                (p for p in sorted_products if product_cost[p] <= start_money), 
+                (p for p in sorted_products if product_cost[p] <= start_money - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 7), 
                 None  # fallback if nothing is affordable
                 )
                 if current_max_value_product == None:
@@ -641,334 +648,177 @@ def agent(obs):
                 else:
                     current_x, current_y = hands_list[i - 1]
                 current_tile = my_tiles[current_y][current_x]
-                #if i == 0:
-                if i < len(hands_list) + 1:
-                    if current_x != i:
-                        worker_actions.append(step_toward((current_x, current_y), (i, 4)))
-                    else:
-                        if current_tile == None:
-                            if remaining_seeds.get("WHEAT", 0) > 0:
-                                worker_actions.append(["PLANT", "WHEAT"])
-                                remaining_seeds["WHEAT"] -= 1
-                            elif remaining_seeds.get("CARROT", 0) > 0:
-                                worker_actions.append(["PLANT", "CARROT"])
-                                remaining_seeds["CARROT"] -= 1
-                            elif remaining_seeds.get("TOMATO", 0) > 0:
-                                worker_actions.append(["PLANT", "TOMATO"])
-                                remaining_seeds["TOMATO"] -= 1
-                            elif remaining_seeds.get("STRAWBERRY", 0) > 0:
-                                worker_actions.append(["PLANT", "STRAWBERRY"])
-                                remaining_seeds["STRAWBERRY"] -= 1
-                            elif remaining_seeds.get("MELON", 0) > 0:
-                                worker_actions.append(["PLANT", "MELON"])
-                                remaining_seeds["MELON"] -= 1
-                            elif "COW" in inventories[0] or "SHEEP" in inventories[0]:
-                                worker_actions.append(["BUILD_PASTURE"])
-                            elif "GOOSE" in inventories[0]:
-                                worker_actions.append(["BUILD_COOP"])
-                            else:
-                                worker_actions.append(["NORTH"])
-                        elif current_tile == "LOCKED":
-                            worker_actions.append(["NORTH"])
-                        elif current_tile.get("kind") == "PLANT":
-                            age = day - current_tile.get("planted_day")
-                            lifespan = product_lifespan[current_tile.get("crop")]
-                            bonus_day_start = math.ceil(lifespan / 2)
-                            max_harvest_size = max_harvest[current_tile.get("crop")]
-                            crop_price = prices[current_tile.get("crop")]
-                            if current_tile.get("consecutive_unwatered") > 0 and not current_tile.get("watered_today"):
-                                worker_actions.append(["WATER"])
-                            elif current_tile.get("crop") == "WHEAT":
-                                if age >= bonus_day_start: #bonus window of wheat
-                                    if not current_tile.get("watered_today"):
-                                        worker_actions.append(["WATER"])
-                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < 2 * crop_price:
-                                        worker_actions.append(["FERTILIZE"])
-                                    elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
-                                        worker_actions.append(["HARVEST"])
-                                    else:
-                                        if current_y > 0:
-                                            worker_actions.append(["NORTH"])
-                                        else:
-                                            worker_actions.append(["PASS"])
-                                else:
-                                    if current_y > 0:
-                                        worker_actions.append(["NORTH"])
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            elif current_tile.get("crop") == "CARROT":
-                                if age >= bonus_day_start: #bonus window of carrot
-                                    if not current_tile.get("watered_today"):
-                                        worker_actions.append(["WATER"])
-                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
-                                        worker_actions.append(["FERTILIZE"]) 
-                                    elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
-                                        worker_actions.append(["HARVEST"])
-                                    else:
-                                        if current_y > 0:
-                                            worker_actions.append(["NORTH"])
-                                        else:
-                                            worker_actions.append(["PASS"])
-                                else:
-                                    if current_y > 0:
-                                        worker_actions.append(["NORTH"])
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            elif current_tile.get("crop") == "MELON":
-                                if age >= bonus_day_start: #bonus window of melon
-                                    if not current_tile.get("watered_today"):
-                                        worker_actions.append(["WATER"])
-                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
-                                        worker_actions.append(["FERTILIZE"]) 
-                                    elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
-                                        worker_actions.append(["HARVEST"])
-                                    else:
-                                        if current_y > 0:
-                                            worker_actions.append(["NORTH"])
-                                        else:
-                                            worker_actions.append(["PASS"])
-                                else:
-                                    if current_y > 0:
-                                        worker_actions.append(["NORTH"])
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            elif current_tile.get("crop") == "TOMATO":
-                                if age in {8, 9, 10, 11}: #bonus window of tomato
-                                    if not current_tile.get("watered_today"):
-                                        worker_actions.append(["WATER"])
-                                    elif age == 8 and current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price * 3:
-                                        worker_actions.append(["FERTILIZE"]) 
-                                    elif (age >= lifespan and current_tile.get("yield_units") > 0) or current_tile.get("yield_units") >= max_harvest_size:
-                                        worker_actions.append(["HARVEST"])
-                                    else:
-                                        if current_y > 0:
-                                            worker_actions.append(["NORTH"])
-                                        else:
-                                            worker_actions.append(["PASS"])
-                                else:
-                                    if current_y > 0:
-                                        worker_actions.append(["NORTH"])
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            elif current_tile.get("crop") == "STRAWBERRY":
-                                if age >= bonus_day_start: #bonus window of strawberry
-                                    if not current_tile.get("watered_today") and age < lifespan:
-                                        worker_actions.append(["WATER"])
-                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[0].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
-                                        worker_actions.append(["FERTILIZE"]) 
-                                    elif (age >= lifespan and current_tile.get("yield_units") > 0) or current_tile.get("yield_units") >= max_harvest_size:
-                                        worker_actions.append(["HARVEST"])
-                                    else:
-                                        if current_y > 0:
-                                            worker_actions.append(["NORTH"])
-                                        else:
-                                            worker_actions.append(["PASS"])
-                                else:
-                                    if current_y > 0:
-                                        worker_actions.append(["NORTH"])
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            else:
-                                print('unknown plant detected')
-                        elif current_tile.get("kind") == "COOP" or current_tile.get("kind") == "PASTURE":
-                            if current_tile.get("animal") == None and current_tile.get("kind") == "PASTURE":
-                                if inventories[0].get("COW", 0) > 0:
-                                    worker_actions.append(["PLACE", "COW"])
-                                elif inventories[0].get("SHEEP", 0) > 0:
-                                    worker_actions.append(["PLACE", "SHEEP"])
-                            elif current_tile.get("animal") == None and current_tile.get("kind") == "COOP":
-                                if inventories[0].get("GOOSE", 0) > 0:
-                                    worker_actions.append(["PLACE", "GOOSE"])
-                            elif (current_tile.get("consecutive_unfed") == 1 or current_tile.get("cared_today")) and inventories[i].get("WHEAT", 0) > 0:
-                                worker_actions.append(["FEED"])
-                            elif current_tile.get("fertilizer_available"):
-                                worker_actions.append(["COLLECT_FERTILIZER"])
-                            elif current_tile.get("animal") == "GOOSE":
-                                if current_tile.get("yield_units") >= 4:
-                                    worker_actions.append(["HARVEST"])
-                                elif current_tile.get("pending_care_bonus") < 3:
-                                    worker_actions.append(["CARE"])
-                                elif current_tile.get("yield_units") > 0:
-                                    worker_actions.append(["HARVEST"])
-                            elif current_tile.get("animal") == "COW":
-                                if current_tile.get("yield_units") >= 6:
-                                    worker_actions.append(["HARVEST"])
-                                elif current_tile.get("pending_care_bonus") < 5:
-                                    worker_actions.append(["CARE"])
-                                elif current_tile.get("yield_units") > 0:
-                                    worker_actions.append(["HARVEST"])
-                            elif current_tile.get("animal") == "SHEEP":
-                                if current_tile.get("yield_units") >= 6:
-                                    worker_actions.append(["HARVEST"])
-                                elif current_tile.get("pending_care_bonus") < 5:
-                                    worker_actions.append(["CARE"])
-                                elif current_tile.get("yield_units") > 0:
-                                    worker_actions.append(["HARVEST"])
-                        elif current_tile.get("kind") == "WEED":
-                            worker_actions.append(["DIG"])
-                            '''
-                elif i == 1:
-                    if current_x != i:
-                        worker_actions.append(step_toward((current_x, current_y), (i, 4)))
-                    else:
-                        if current_tile == None:
-                            if seeds.get("WHEAT", 0) > 0:
-                                worker_actions.append(["PLANT", "WHEAT"])
-                            elif seeds.get("CARROT", 0) > 0:
-                                worker_actions.append(["PLANT", "CARROT"])
-                            elif seeds.get("TOMATO", 0) > 0:
-                                worker_actions.append(["PLANT", "TOMATO"])
-                            elif seeds.get("STRAWBERRY", 0) > 0:
-                                worker_actions.append(["PLANT", "STRAWBERRY"])
-                            elif seeds.get("MELON", 0) > 0:
-                                worker_actions.append(["PLANT", "MELON"])
-                            elif "COW" in inventories[i] or "SHEEP" in inventories[i]:
-                                worker_actions.append(["BUILD_PASTURE"])
-                            elif "GOOSE" in inventories[i]:
-                                worker_actions.append(["BUILD_COOP"])
-                            else:
-                                worker_actions.append(["NORTH"])
-                        elif current_tile == "LOCKED":
-                            worker_actions.append(["NORTH"])
-                        elif current_tile.get("kind") == "PLANT":
-                            age = day - current_tile.get("planted_day")
-                            lifespan = product_lifespan[current_tile.get("crop")]
-                            bonus_day_start = math.ceil(lifespan / 2)
-                            max_harvest_size = max_harvest[current_tile.get("crop")]
-                            crop_price = prices[current_tile.get("crop")]
-                            if current_tile.get("consecutive_unwatered") > 0 and not current_tile.get("watered_today"):
-                                worker_actions.append(["WATER"])
-                            elif current_tile.get("crop") == "WHEAT":
-                                if age >= bonus_day_start: #bonus window of wheat
-                                    if not current_tile.get("watered_today"):
-                                        worker_actions.append(["WATER"])
-                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < 2 * crop_price:
-                                        worker_actions.append(["FERTILIZE"])
-                                    elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
-                                        worker_actions.append(["HARVEST"])
-                                    else:
-                                        if current_y > 0:
-                                            worker_actions.append(["NORTH"])
-                                        else:
-                                            worker_actions.append(["PASS"])
-                                else:
-                                    if current_y > 0:
-                                        worker_actions.append(["NORTH"])
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            elif current_tile.get("crop") == "CARROT":
-                                if age >= bonus_day_start: #bonus window of carrot
-                                    if not current_tile.get("watered_today"):
-                                        worker_actions.append(["WATER"])
-                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
-                                        worker_actions.append(["FERTILIZE"]) 
-                                    elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
-                                        worker_actions.append(["HARVEST"])
-                                    else:
-                                        if current_y > 0:
-                                            worker_actions.append(["NORTH"])
-                                        else:
-                                            worker_actions.append(["PASS"])
-                                else:
-                                    if current_y > 0:
-                                        worker_actions.append(["NORTH"])
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            elif current_tile.get("crop") == "MELON":
-                                if age >= bonus_day_start: #bonus window of melon
-                                    if not current_tile.get("watered_today"):
-                                        worker_actions.append(["WATER"])
-                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
-                                        worker_actions.append(["FERTILIZE"]) 
-                                    elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
-                                        worker_actions.append(["HARVEST"])
-                                    else:
-                                        if current_y > 0:
-                                            worker_actions.append(["NORTH"])
-                                        else:
-                                            worker_actions.append(["PASS"])
-                                else:
-                                    if current_y > 0:
-                                        worker_actions.append(["NORTH"])
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            elif current_tile.get("crop") == "TOMATO":
-                                if age in {8, 9, 10, 11}: #bonus window of tomato
-                                    if not current_tile.get("watered_today"):
-                                        worker_actions.append(["WATER"])
-                                    elif age == 8 and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price * 3:
-                                        worker_actions.append(["FERTILIZE"]) 
-                                    elif (age >= lifespan and current_tile.get("yield_units") > 0) or current_tile.get("yield_units") >= max_harvest_size:
-                                        worker_actions.append(["HARVEST"])
-                                    else:
-                                        if current_y > 0:
-                                            worker_actions.append(["NORTH"])
-                                        else:
-                                            worker_actions.append(["PASS"])
-                                else:
-                                    if current_y > 0:
-                                        worker_actions.append(["NORTH"])
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            elif current_tile.get("crop") == "STRAWBERRY":
-                                if age >= bonus_day_start: #bonus window of strawberry
-                                    if not current_tile.get("watered_today") and age < lifespan:
-                                        worker_actions.append(["WATER"])
-                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
-                                        worker_actions.append(["FERTILIZE"]) 
-                                    elif (age >= lifespan and current_tile.get("yield_units") > 0) or current_tile.get("yield_units") >= max_harvest_size:
-                                        worker_actions.append(["HARVEST"])
-                                    else:
-                                        if current_y > 0:
-                                            worker_actions.append(["NORTH"])
-                                        else:
-                                            worker_actions.append(["PASS"])
-                                else:
-                                    if current_y > 0:
-                                        worker_actions.append(["NORTH"])
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            else:
-                                print('unknown plant detected')
-                        elif current_tile.get("kind") == "COOP" or current_tile.get("kind") == "PASTURE":
-                            if current_tile.get("animal") == None and current_tile.get("kind") == "PASTURE":
-                                if inventories[i].get("COW", 0) > 0:
-                                    worker_actions.append(["PLACE", "COW"])
-                                elif inventories[i].get("SHEEP", 0) > 0:
-                                    worker_actions.append(["PLACE", "SHEEP"])
-                            elif current_tile.get("animal") == None and current_tile.get("kind") == "COOP":
-                                if inventories[i].get("GOOSE", 0) > 0:
-                                    worker_actions.append(["PLACE", "GOOSE"])
-                            elif (current_tile.get("consecutive_unfed") == 1 or current_tile.get("cared_today")) and inventories[i].get("WHEAT", 0) > 0:
-                                worker_actions.append(["FEED"])
-                            elif current_tile.get("fertilizer_available"):
-                                worker_actions.append(["COLLECT_FERTILIZER"])
-                            elif current_tile.get("animal") == "GOOSE":
-                                if current_tile.get("yield_units") >= 4:
-                                    worker_actions.append(["HARVEST"])
-                                elif current_tile.get("pending_care_bonus") < 3:
-                                    worker_actions.append(["CARE"])
-                                elif current_tile.get("yield_units") > 0:
-                                    worker_actions.append(["HARVEST"])
-                            elif current_tile.get("animal") == "COW":
-                                if current_tile.get("yield_units") >= 6:
-                                    worker_actions.append(["HARVEST"])
-                                elif current_tile.get("pending_care_bonus") < 5:
-                                    worker_actions.append(["CARE"])
-                                elif current_tile.get("yield_units") > 0:
-                                    worker_actions.append(["HARVEST"])
-                            elif current_tile.get("animal") == "SHEEP":
-                                if current_tile.get("yield_units") >= 6:
-                                    worker_actions.append(["HARVEST"])
-                                elif current_tile.get("pending_care_bonus") < 5:
-                                    worker_actions.append(["CARE"])
-                                elif current_tile.get("yield_units") > 0:
-                                    worker_actions.append(["HARVEST"])
-                        elif current_tile.get("kind") == "WEED":
-                            worker_actions.append(["DIG"])
-                            '''
+                if i == 0 and current_x != 0:
+                    worker_actions.append(step_toward((current_x, current_y), (0, 4)))
+                elif i == 1 and current_x != 2:
+                    worker_actions.append(step_toward((current_x, current_y), (2, 4)))
+                elif i == 2 and current_x != 3:
+                    worker_actions.append(step_toward((current_x, current_y), (3, 4)))
+                elif i == 3 and current_x != 4:
+                    worker_actions.append(step_toward((current_x, current_y), (4, 4)))
+                elif i == 4 and current_x != 1:
+                    worker_actions.append(step_toward((current_x, current_y), (1, 4)))
                 else:
-                    worker_actions.append(["PASS"])
+                    if current_tile == None:
+                        if remaining_seeds.get("WHEAT", 0) > 0:
+                            worker_actions.append(["PLANT", "WHEAT"])
+                            remaining_seeds["WHEAT"] -= 1
+                        elif remaining_seeds.get("CARROT", 0) > 0:
+                            worker_actions.append(["PLANT", "CARROT"])
+                            remaining_seeds["CARROT"] -= 1
+                        elif remaining_seeds.get("TOMATO", 0) > 0:
+                            worker_actions.append(["PLANT", "TOMATO"])
+                            remaining_seeds["TOMATO"] -= 1
+                        elif remaining_seeds.get("STRAWBERRY", 0) > 0:
+                            worker_actions.append(["PLANT", "STRAWBERRY"])
+                            remaining_seeds["STRAWBERRY"] -= 1
+                        elif remaining_seeds.get("MELON", 0) > 0:
+                            worker_actions.append(["PLANT", "MELON"])
+                            remaining_seeds["MELON"] -= 1
+                        elif "COW" in inventories[i] or "SHEEP" in inventories[i]:
+                            worker_actions.append(["BUILD_PASTURE"])
+                        elif "GOOSE" in inventories[i]:
+                            worker_actions.append(["BUILD_COOP"])
+                        else:
+                            worker_actions.append(["NORTH"])
+                    elif current_tile == "LOCKED":
+                        worker_actions.append(["NORTH"])
+                    elif current_tile.get("kind") == "PLANT":
+                        age = day - current_tile.get("planted_day")
+                        lifespan = product_lifespan[current_tile.get("crop")]
+                        bonus_day_start = math.ceil(lifespan / 2)
+                        max_harvest_size = max_harvest[current_tile.get("crop")]
+                        crop_price = prices[current_tile.get("crop")]
+                        if current_tile.get("consecutive_unwatered") > 0 and not current_tile.get("watered_today"):
+                            worker_actions.append(["WATER"])
+                        elif current_tile.get("crop") == "WHEAT":
+                            if age >= bonus_day_start: #bonus window of wheat
+                                if not current_tile.get("watered_today"):
+                                    worker_actions.append(["WATER"])
+                                elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < 2 * crop_price:
+                                    worker_actions.append(["FERTILIZE"])
+                                elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
+                                    worker_actions.append(["HARVEST"])
+                                else:
+                                    if current_y > 0:
+                                        worker_actions.append(["NORTH"])
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            else:
+                                if current_y > 0:
+                                    worker_actions.append(["NORTH"])
+                                else:
+                                    worker_actions.append(["PASS"])
+                        elif current_tile.get("crop") == "CARROT":
+                            if age >= bonus_day_start: #bonus window of carrot
+                                if not current_tile.get("watered_today"):
+                                    worker_actions.append(["WATER"])
+                                elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
+                                    worker_actions.append(["FERTILIZE"]) 
+                                elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
+                                    worker_actions.append(["HARVEST"])
+                                else:
+                                    if current_y > 0:
+                                        worker_actions.append(["NORTH"])
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            else:
+                                if current_y > 0:
+                                    worker_actions.append(["NORTH"])
+                                else:
+                                    worker_actions.append(["PASS"])
+                        elif current_tile.get("crop") == "MELON":
+                            if age >= bonus_day_start: #bonus window of melon
+                                if not current_tile.get("watered_today"):
+                                    worker_actions.append(["WATER"])
+                                elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
+                                    worker_actions.append(["FERTILIZE"]) 
+                                elif age >= lifespan or current_tile.get("yield_units") >= max_harvest_size:
+                                    worker_actions.append(["HARVEST"])
+                                else:
+                                    if current_y > 0:
+                                        worker_actions.append(["NORTH"])
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            else:
+                                if current_y > 0:
+                                    worker_actions.append(["NORTH"])
+                                else:
+                                    worker_actions.append(["PASS"])
+                        elif current_tile.get("crop") == "TOMATO":
+                            if age in {8, 9, 10, 11}: #bonus window of tomato
+                                if not current_tile.get("watered_today"):
+                                    worker_actions.append(["WATER"])
+                                elif age == 8 and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price * 3:
+                                    worker_actions.append(["FERTILIZE"]) 
+                                elif (age >= lifespan and current_tile.get("yield_units") > 0) or current_tile.get("yield_units") >= max_harvest_size:
+                                    worker_actions.append(["HARVEST"])
+                                else:
+                                    if current_y > 0:
+                                        worker_actions.append(["NORTH"])
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            else:
+                                if current_y > 0:
+                                    worker_actions.append(["NORTH"])
+                                else:
+                                    worker_actions.append(["PASS"])
+                        elif current_tile.get("crop") == "STRAWBERRY":
+                            if age >= bonus_day_start: #bonus window of strawberry
+                                if not current_tile.get("watered_today") and age < lifespan:
+                                    worker_actions.append(["WATER"])
+                                elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
+                                    worker_actions.append(["FERTILIZE"]) 
+                                elif (age >= lifespan and current_tile.get("yield_units") > 0) or current_tile.get("yield_units") >= max_harvest_size:
+                                    worker_actions.append(["HARVEST"])
+                                else:
+                                    if current_y > 0:
+                                        worker_actions.append(["NORTH"])
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            else:
+                                if current_y > 0:
+                                    worker_actions.append(["NORTH"])
+                                else:
+                                    worker_actions.append(["PASS"])
+                        else:
+                            print('unknown plant detected')
+                    elif current_tile.get("kind") == "COOP" or current_tile.get("kind") == "PASTURE":
+                        if current_tile.get("animal") == None and current_tile.get("kind") == "PASTURE":
+                            if inventories[i].get("COW", 0) > 0:
+                                worker_actions.append(["PLACE", "COW"])
+                            elif inventories[i].get("SHEEP", 0) > 0:
+                                worker_actions.append(["PLACE", "SHEEP"])
+                        elif current_tile.get("animal") == None and current_tile.get("kind") == "COOP":
+                            if inventories[i].get("GOOSE", 0) > 0:
+                                worker_actions.append(["PLACE", "GOOSE"])
+                        elif (current_tile.get("consecutive_unfed") == 1 or current_tile.get("cared_today")) and inventories[i].get("WHEAT", 0) > 0:
+                            worker_actions.append(["FEED"])
+                        elif current_tile.get("fertilizer_available"):
+                            worker_actions.append(["COLLECT_FERTILIZER"])
+                        elif current_tile.get("animal") == "GOOSE":
+                            if current_tile.get("yield_units") >= 4:
+                                worker_actions.append(["HARVEST"])
+                            elif current_tile.get("pending_care_bonus") < 3:
+                                worker_actions.append(["CARE"])
+                            elif current_tile.get("yield_units") > 0:
+                                worker_actions.append(["HARVEST"])
+                        elif current_tile.get("animal") == "COW":
+                            if current_tile.get("yield_units") >= 6:
+                                worker_actions.append(["HARVEST"])
+                            elif current_tile.get("pending_care_bonus") < 5:
+                                worker_actions.append(["CARE"])
+                            elif current_tile.get("yield_units") > 0:
+                                worker_actions.append(["HARVEST"])
+                        elif current_tile.get("animal") == "SHEEP":
+                            if current_tile.get("yield_units") >= 6:
+                                worker_actions.append(["HARVEST"])
+                            elif current_tile.get("pending_care_bonus") < 5:
+                                worker_actions.append(["CARE"])
+                            elif current_tile.get("yield_units") > 0:
+                                worker_actions.append(["HARVEST"])
+                    elif current_tile.get("kind") == "WEED":
+                        worker_actions.append(["DIG"])
             
 
 

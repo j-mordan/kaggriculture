@@ -697,15 +697,16 @@ def agent(obs):
                     current_x, current_y = hands_list[i - 1]
                 current_tile = my_tiles[current_y][current_x]
                 if current_x != farmer_col[i]:
+                    animals_in_shed = shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0)
                     if shed.get("GOOSE", 0) > 0 and empty_tiles_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
                         worker_actions.append(["PICKUP", "GOOSE", min(2, empty_tiles_in_col[farmer_col[i]], shed.get("GOOSE", 0))])
-                        held_animals = min(2, empty_tiles_in_col[farmer_col[i]], shed.get("GOOSE", 0))
+                        held_animals = min(math.ceil(animals_in_shed // 5), empty_tiles_in_col[farmer_col[i]], shed.get("GOOSE", 0))
                     elif shed.get("COW", 0) > 0 and empty_tiles_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
                         worker_actions.append(["PICKUP", "COW", min(2, empty_tiles_in_col[farmer_col[i]], shed.get("COW", 0))])
-                        held_animals = min(2, empty_tiles_in_col[farmer_col[i]], shed.get("COW", 0))
+                        held_animals = min(math.ceil(animals_in_shed // 5), empty_tiles_in_col[farmer_col[i]], shed.get("COW", 0))
                     elif shed.get("SHEEP", 0) > 0 and empty_tiles_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
                         worker_actions.append(["PICKUP", "SHEEP", min(2, empty_tiles_in_col[farmer_col[i]], shed.get("SHEEP", 0))])
-                        held_animals = min(2, empty_tiles_in_col[farmer_col[i]], shed.get("SHEEP", 0))
+                        held_animals = min(math.ceil(animals_in_shed // 5), empty_tiles_in_col[farmer_col[i]], shed.get("SHEEP", 0))
                     if (current_x, current_y) in shed_adjacent_tiles and inventories[i].get("WHEAT", 0) < held_animals + animals_in_col[farmer_col[i]]:
                         worker_actions.append(["PICKUP", "WHEAT", held_animals + animals_in_col[farmer_col[i]] - inventories[i].get("WHEAT", 0)])
                     else:

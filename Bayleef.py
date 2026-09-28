@@ -336,13 +336,13 @@ def agent(obs):
         8: (6, 0),
         9: (8, 0),
         10: (3, 9),
-        11: (2, 9),
+        11: (0, 9),
         12: (1, 9),
-        13: (4, 9),
-        14: (0, 9),
-        15: (9, 9),
-        16: (5, 9),
-        17: (8, 9),
+        13: (2, 9),
+        14: (4, 9),
+        15: (8, 9),
+        16: (9, 9),
+        17: (5, 9),
         18: (7, 9),
         19: (6, 9)
     }
@@ -366,26 +366,64 @@ def agent(obs):
             elif tile == "LOCKED":
                 continue
             elif tile.get("kind") == "PLANT":
+                age = day - tile.get("planted_day", 0)
+                max_harvest_size = max_harvest[tile.get("crop")]
+                first_yield_day = time_to_first_yield[tile.get("crop")]
+                lifespan = product_lifespan[tile.get("crop")]
                 if tile.get("crop") == "WHEAT":
                     projected_produced["WHEAT"] += projected_harvest["WHEAT"]
+                    if age >= lifespan or (tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
+                        empty_tiles += 1
+                        if y <= 4:
+                            empty_tiles_in_col[(x, 0)] += 1
+                        else:
+                            empty_tiles_in_col[(x, 9)] += 1
+                        empty_tile_list.append((x, y))
                     #if tile.get("fertilized_until_day") == -1:
                         #projected_produced["FERTILIZER"] -= 1
                 elif tile.get("crop") == "CARROT":
                     projected_produced["CARROT"] += projected_harvest["CARROT"]
+                    if age >= lifespan or (tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
+                        empty_tiles += 1
+                        if y <= 4:
+                            empty_tiles_in_col[(x, 0)] += 1
+                        else:
+                            empty_tiles_in_col[(x, 9)] += 1
+                        empty_tile_list.append((x, y))
                     #if tile.get("fertilized_until_day") == -1:
                         #projected_produced["FERTILIZER"] -= 1
                 elif tile.get("crop") == "MELON":
                     projected_produced["MELON"] += projected_harvest["MELON"]
+                    if age >= lifespan or (tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
+                        empty_tiles += 1
+                        if y <= 4:
+                            empty_tiles_in_col[(x, 0)] += 1
+                        else:
+                            empty_tiles_in_col[(x, 9)] += 1
+                        empty_tile_list.append((x, y))
                 elif tile.get("crop") == "TOMATO":
                     projected_produced["TOMATO"] += projected_harvest["TOMATO"]
+                    if age >= lifespan:
+                        empty_tiles += 1
+                        if y <= 4:
+                            empty_tiles_in_col[(x, 0)] += 1
+                        else:
+                            empty_tiles_in_col[(x, 9)] += 1
+                        empty_tile_list.append((x, y))
                     is_fertilized_now = tile.get("fertilized_until_day", -1) >= day
-                    if day - tile.get("planted_day") < 8:
+                    if age < 8:
                         projected_produced["FERTILIZER"] -= 1
-                    elif day - tile.get("planted_day") == 8 and not is_fertilized_now:
+                    elif age == 8 and not is_fertilized_now:
                         projected_produced["FERTILIZER"] -= 1
                 elif tile.get("crop") == "STRAWBERRY":
                     projected_produced["STRAWBERRY"] += projected_harvest["STRAWBERRY"]
-                    age = day - tile.get("planted_day", 0)
+                    if age >= lifespan:
+                        empty_tiles += 1
+                        if y <= 4:
+                            empty_tiles_in_col[(x, 0)] += 1
+                        else:
+                            empty_tiles_in_col[(x, 9)] += 1
+                        empty_tile_list.append((x, y))
                     is_fertilized_now = tile.get("fertilized_until_day", -1) >= day
                     if age < 10:
                         projected_produced["FERTILIZER"] -= 2
@@ -401,7 +439,12 @@ def agent(obs):
                             projected_produced["FERTILIZER"] -= 1
                     
             elif tile.get("kind") == "WEED":
-                continue
+                empty_tiles += 1
+                if y <= 4:
+                    empty_tiles_in_col[(x, 0)] += 1
+                else:
+                    empty_tiles_in_col[(x, 9)] += 1
+                empty_tile_list.append((x, y))
             elif tile.get("kind") == "COOP":
                 if tile.get("animal") == "GOOSE":
                     projected_produced["EGG"] += projected_harvest["EGG"] - ((day - tile.get("placed_day")) if day - tile.get("placed_day") < 4 else 0)
@@ -1095,6 +1138,8 @@ def agent(obs):
                                 worker_actions.append(["FERTILIZE"]) 
                             elif (age >= lifespan and current_tile.get("yield_units") > 0) or (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
                                 worker_actions.append(["HARVEST"])
+                            elif age >= lifespan:
+                                worker_actions.append(["DIG"])
                             else:
                                 if current_y != r:
                                     worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
@@ -1113,6 +1158,8 @@ def agent(obs):
                                 worker_actions.append(["FERTILIZE"]) 
                             elif (age >= lifespan and current_tile.get("yield_units") > 0) or (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
                                 worker_actions.append(["HARVEST"])
+                            elif age >= lifespan:
+                                worker_actions.append(["DIG"])
                             else:
                                 if current_y != r:
                                     worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))

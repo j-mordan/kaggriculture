@@ -913,6 +913,7 @@ def agent(obs):
         strawberry_seed_wanted = 0
         total_seeds_and_animals = seeds.get("WHEAT", 0) + seeds.get("CARROT", 0) + seeds.get("MELON", 0) + seeds.get("TOMATO", 0) + seeds.get("STRAWBERRY", 0) + shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0) + sum(inventories[k].get("COW", 0) + inventories[k].get("SHEEP", 0) + inventories[k].get("GOOSE", 0) for k in range(len(hands_list) + 1)) 
         start_money = my_farm["money"] - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 2 - 40
+        unlocked_quads = len(my_farm["unlocked_quadrants"])
         affordable = True
         while affordable: #change so if a purchase goes lower than 0 it doesn't go through
             sorted_products = sorted(
@@ -928,12 +929,13 @@ def agent(obs):
             None  # fallback if nothing is affordable, add to this for plants about to be harvested
             )
             if total_seeds_and_animals >= empty_tiles:
-                if len(my_farm["unlocked_quadrants"]) < 3 and start_money > new_quadrant_costs[len(my_farm["unlocked_quadrants"]) + 1]:
+                if unlocked_quads < 3 and start_money > new_quadrant_costs[unlocked_quads + 1]:
                     #print(total_seeds_and_animals)
                     #print(empty_tiles)
                     start_money -= new_quadrant_costs[len(my_farm["unlocked_quadrants"]) + 1]
                     market_orders.append(["BUY_LAND"])
                     empty_tiles += 25
+                    unlocked_quads += 1
                 else:
                     break
             if current_max_value_product == None:

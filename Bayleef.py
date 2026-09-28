@@ -14,7 +14,7 @@ def step_toward(pos, target):
         return ["EAST"] if dx > 0 else ["WEST"]
     if dy != 0:
         return ["SOUTH"] if dy > 0 else ["NORTH"]
-    return None
+    return ["PASS"]
 
 def eval_func(func, x, T):
     if func == "linear":
@@ -652,8 +652,8 @@ def agent(obs):
         "TOMATO" : projected_prices["TOMATO"] * projected_harvest["TOMATO"] / product_lifespan["TOMATO"] if 30 - day > time_to_first_yield["TOMATO"] else 0,
         "STRAWBERRY" : projected_prices["STRAWBERRY"] * projected_harvest["STRAWBERRY"] / product_lifespan["STRAWBERRY"] if 30 - day > time_to_first_yield["STRAWBERRY"] else 0,
         "EGG" : (projected_prices["EGG"] * projected_harvest["EGG"] / product_lifespan["EGG"] if 26 - day > 0 else 0) + (projected_prices["FERTILIZER"] * projected_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0),
-        "MILK" : projected_prices["MILK"] * projected_harvest["MILK"] / product_lifespan["MILK"] if 22 - day > 0 else 0 + (projected_prices["FERTILIZER"] * projected_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0),
-        "WOOL" : projected_prices["WOOL"] * projected_harvest["WOOL"] / product_lifespan["WOOL"] if 24 - day > 0 else 0 + (projected_prices["FERTILIZER"] * projected_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0)
+        "MILK" : (projected_prices["MILK"] * projected_harvest["MILK"] / product_lifespan["MILK"] if 22 - day > 0 else 0) + (projected_prices["FERTILIZER"] * projected_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0),
+        "WOOL" : (projected_prices["WOOL"] * projected_harvest["WOOL"] / product_lifespan["WOOL"] if 24 - day > 0 else 0) + (projected_prices["FERTILIZER"] * projected_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"] if day < 30 else 0)
     }
 
     product_cost = {
@@ -715,6 +715,8 @@ def agent(obs):
     market_orders = []
     # 2. Market Execution (Hourly / Daily triggers)
     # Buy seeds, sell ready produce, hire farm hands
+    if shed.get("FERTILIZER", 0) > 0:
+        market_orders.append(["SELL", "FERTILIZER", shed.get("FERTILIZER", 0)])
     #if shed.get("WHEAT", 0) > 0:
         #market_orders.append(["SELL", "WHEAT", 1])
     if shed.get("CARROT", 0) > 0:
@@ -731,8 +733,6 @@ def agent(obs):
         market_orders.append(["SELL", "MILK", shed.get("MILK", 0)])
     if shed.get("WOOL", 0) > 0:
         market_orders.append(["SELL", "WOOL", shed.get("WOOL", 0)])
-    if shed.get("FERTILIZER", 0) > 0:
-        market_orders.append(["SELL", "FERTILIZER", shed.get("FERTILIZER", 0)])
     if hour == 0:
         #print('product_values:', product_values)
         # e.g., buy seeds or hire hands at the start of a new day
@@ -748,7 +748,7 @@ def agent(obs):
         sheep_wanted = 0
         wheat_wanted = 0
         total_seeds_and_animals = seeds.get("WHEAT", 0) + seeds.get("CARROT", 0) + seeds.get("MELON", 0) + seeds.get("TOMATO", 0) + seeds.get("STRAWBERRY", 0) + shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0)
-        start_money = my_farm["money"] - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 2 - 20
+        start_money = my_farm["money"] - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 2 - 40
         affordable = True
         while affordable: #change so if a purchase goes lower than 0 it doesn't go through
             sorted_products = sorted(
@@ -760,15 +760,18 @@ def agent(obs):
             (p for p in sorted_products if seed_cost[p] <= start_money), 
             None  # fallback if nothing is affordable, add to this for plants about to be harvested
             )
-            if total_seeds_and_animals > empty_tiles:
+            if total_seeds_and_animals >= empty_tiles:
                 if len(my_farm["unlocked_quadrants"]) < 3 and start_money > new_quadrant_costs[len(my_farm["unlocked_quadrants"]) + 1]:
-                    print(total_seeds_and_animals)
-                    print(empty_tiles)
+                    #print(total_seeds_and_animals)
+                    #print(empty_tiles)
+                    start_money -= new_quadrant_costs[len(my_farm["unlocked_quadrants"]) + 1]
                     market_orders.append(["BUY_LAND"])
                     empty_tiles += 25
                 else:
                     break
             if current_max_value_product == None:
+                affordable = False
+            elif product_values[current_max_value_product] < 0:
                 affordable = False
             elif current_max_value_product == "WHEAT":
                 wheat_seed_wanted += 1
@@ -793,19 +796,39 @@ def agent(obs):
             elif current_max_value_product == "EGG":
                 goose_wanted += 1
                 start_money -= seed_cost["EGG"]
+                if hour == 0:
+                    start_money -= prices["WHEAT"]
                 update_value("EGG")
             elif current_max_value_product == "MILK":
                 cow_wanted += 1
                 start_money -= seed_cost["MILK"]
+                if hour == 0:
+                    start_money -= prices["WHEAT"]
                 update_value("MILK")
             elif current_max_value_product == "WOOL":
                 sheep_wanted += 1
                 start_money -= seed_cost["WOOL"]
+                if hour == 0:
+                    start_money -= prices["WHEAT"]
                 update_value("WOOL")
             else:
                 print('something went wrong with current_max_value_product:', current_max_value_product)
                 break
             total_seeds_and_animals += 1
+        if goose_wanted > 0:
+            market_orders.append(["BUY_ANIMAL", "GOOSE", goose_wanted])
+        if cow_wanted > 0:
+            market_orders.append(["BUY_ANIMAL", "COW", cow_wanted])
+        if sheep_wanted > 0:
+            market_orders.append(["BUY_ANIMAL", "SHEEP", sheep_wanted])
+        if goose_wanted + cow_wanted + sheep_wanted > 0:
+            wheat_wanted += goose_wanted + cow_wanted + sheep_wanted
+        total_animals = sum(animals_in_col.values())
+        animals_in_shed = shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0)
+        if day == 0:
+            wheat_wanted *= 2
+        if total_animals + wheat_wanted + animals_in_shed > shed_contents["WHEAT"]:
+            market_orders.append(["BUY_PRODUCT", "WHEAT", total_animals + wheat_wanted + animals_in_shed - shed_contents["WHEAT"]])
         if wheat_seed_wanted > 0:
             market_orders.append(["BUY_SEED", "WHEAT", wheat_seed_wanted])
         if carrot_seed_wanted > 0:
@@ -816,21 +839,8 @@ def agent(obs):
             market_orders.append(["BUY_SEED", "TOMATO", tomato_seed_wanted])
         if strawberry_seed_wanted > 0:
             market_orders.append(["BUY_SEED", "STRAWBERRY", strawberry_seed_wanted])
-        if goose_wanted > 0:
-            market_orders.append(["BUY_ANIMAL", "GOOSE", goose_wanted])
-        if cow_wanted > 0:
-            market_orders.append(["BUY_ANIMAL", "COW", cow_wanted])
-        if sheep_wanted > 0:
-            market_orders.append(["BUY_ANIMAL", "SHEEP", sheep_wanted])
-        if tomato_seed_wanted + strawberry_seed_wanted * 2 > 0:
-            market_orders.append(["BUY_PRODUCT", "FERTILIZER", tomato_seed_wanted + strawberry_seed_wanted * 2])
-        if goose_wanted + cow_wanted + sheep_wanted > 0:
-            wheat_wanted += goose_wanted + cow_wanted + sheep_wanted
-        total_animals = sum(animals_in_col.values())
-        if day == 0:
-            wheat_wanted *= 2
-        if total_animals + wheat_wanted > shed_contents["WHEAT"]:
-            market_orders.append(["BUY_PRODUCT", "WHEAT", total_animals + wheat_wanted - shed_contents["WHEAT"]])
+        #if tomato_seed_wanted + strawberry_seed_wanted * 2 > 0:
+        #    market_orders.append(["BUY_PRODUCT", "FERTILIZER", tomato_seed_wanted + strawberry_seed_wanted * 2])
         #if day == 0:
             #product_values["MELON"] += 100
             #if my_farm["money"] >= 200 and seeds.get("MELON", 0) < 5:
@@ -842,6 +852,7 @@ def agent(obs):
         current_x, current_y = farmer_pos
         if current_x != 0:
             worker_actions.append(["PASS"]) #why not move
+        print(market_orders)
 
     # 3. Task Selection & Route Execution
     # Determine what the farmer standing on (farmer_pos[0], farmer_pos[1]) needs to do
@@ -871,9 +882,9 @@ def agent(obs):
                     col = x
                     row = y
             if row <= 4:
-                animals_needed[(row, 0)] += 1
+                animals_needed[(col, 0)] += 1
             else:
-                animals_needed[(row, 9)] += 1
+                animals_needed[(col, 9)] += 1
             animals_in_shed -= 1
             empty_tile_list.remove((col, row))
         

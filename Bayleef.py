@@ -16,6 +16,10 @@ def step_toward(pos, target):
         return ["SOUTH"] if dy > 0 else ["NORTH"]
     return ["PASS"]
 
+def manhattan_distance(pos1: tuple[int, int], pos2: tuple[int, int]) -> int:
+    """Calculates the Manhattan distance between two (x, y) coordinates."""
+    return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+
 def eval_func(func, x, T):
     if func == "linear":
         return x
@@ -324,7 +328,7 @@ def agent(obs):
         (9, 9): 0,   
     }
 
-    farmer_col = {
+    farmer_col = { #default, incorrect because market orders happen in multiple turns
         0: (0, 0),
         1: (1, 0),
         2: (3, 0),
@@ -901,7 +905,75 @@ def agent(obs):
     # Determine what the farmer standing on (farmer_pos[0], farmer_pos[1]) needs to do
     elif hour < 24: 
         for i in range(len(my_farm["unlocked_quadrants"]) * 5 - 1 - my_farm.get("hires_today", 0)):
-            market_orders.append(["HIRE"])   
+            market_orders.append(["HIRE"])
+        wheat_seed_wanted = 0
+        carrot_seed_wanted = 0
+        melon_seed_wanted = 0
+        tomato_seed_wanted = 0
+        strawberry_seed_wanted = 0
+        total_seeds_and_animals = seeds.get("WHEAT", 0) + seeds.get("CARROT", 0) + seeds.get("MELON", 0) + seeds.get("TOMATO", 0) + seeds.get("STRAWBERRY", 0) + shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0) + sum(inventories[k].get("COW", 0) + inventories[k].get("SHEEP", 0) + inventories[k].get("GOOSE", 0) for k in range(len(hands_list) + 1)) 
+        start_money = my_farm["money"] - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 2 - 40
+        affordable = True
+        while affordable: #change so if a purchase goes lower than 0 it doesn't go through
+            sorted_products = sorted(
+            product_values.keys(), 
+            key=lambda p: product_values[p], 
+            reverse=True
+            )
+            for animal in ("EGG", "MILK", "WOOL"):
+                if animal in sorted_products:
+                    sorted_products.remove(animal)
+            current_max_value_product = next(
+            (p for p in sorted_products if seed_cost[p] <= start_money), 
+            None  # fallback if nothing is affordable, add to this for plants about to be harvested
+            )
+            if total_seeds_and_animals >= empty_tiles:
+                if len(my_farm["unlocked_quadrants"]) < 3 and start_money > new_quadrant_costs[len(my_farm["unlocked_quadrants"]) + 1]:
+                    #print(total_seeds_and_animals)
+                    #print(empty_tiles)
+                    start_money -= new_quadrant_costs[len(my_farm["unlocked_quadrants"]) + 1]
+                    market_orders.append(["BUY_LAND"])
+                    empty_tiles += 25
+                else:
+                    break
+            if current_max_value_product == None:
+                affordable = False
+            elif product_values[current_max_value_product] < 0:
+                affordable = False
+            elif current_max_value_product == "WHEAT":
+                wheat_seed_wanted += 1
+                start_money -= seed_cost["WHEAT"]
+                update_value("WHEAT")
+            elif current_max_value_product == "CARROT":
+                carrot_seed_wanted += 1
+                start_money -= seed_cost["CARROT"]
+                update_value("CARROT")
+            elif current_max_value_product == "MELON":
+                melon_seed_wanted += 1
+                start_money -= seed_cost["MELON"]
+                update_value("MELON")
+            elif current_max_value_product == "TOMATO":
+                tomato_seed_wanted += 1
+                start_money -= seed_cost["TOMATO"]
+                update_value("TOMATO")
+            elif current_max_value_product == "STRAWBERRY":
+                strawberry_seed_wanted += 1
+                start_money -= seed_cost["STRAWBERRY"]
+                update_value("STRAWBERRY")
+            else:
+                print('something went wrong with current_max_value_product:', current_max_value_product)
+                break
+            total_seeds_and_animals += 1
+        if wheat_seed_wanted > 0:
+            market_orders.append(["BUY_SEED", "WHEAT", wheat_seed_wanted])
+        if carrot_seed_wanted > 0:
+            market_orders.append(["BUY_SEED", "CARROT", carrot_seed_wanted])
+        if melon_seed_wanted > 0:
+            market_orders.append(["BUY_SEED", "MELON", melon_seed_wanted])
+        if tomato_seed_wanted > 0:
+            market_orders.append(["BUY_SEED", "TOMATO", tomato_seed_wanted])
+        if strawberry_seed_wanted > 0:
+            market_orders.append(["BUY_SEED", "STRAWBERRY", strawberry_seed_wanted])
         animals_in_shed = shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0)
         animals_needed = defaultdict(int)
         goose_needed = defaultdict(int)
@@ -1178,9 +1250,19 @@ def agent(obs):
                             worker_actions.append(["PLACE", "COW"])
                         elif inventories[i].get("SHEEP", 0) > 0:
                             worker_actions.append(["PLACE", "SHEEP"])
+                        else:
+                            if current_y != r:
+                                worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                            else:
+                                worker_actions.append(["PASS"])
                     elif current_tile.get("animal") == None and current_tile.get("kind") == "COOP":
                         if inventories[i].get("GOOSE", 0) > 0:
                             worker_actions.append(["PLACE", "GOOSE"])
+                        else:
+                            if current_y != r:
+                                worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                            else:
+                                worker_actions.append(["PASS"])
                     elif (current_tile.get("consecutive_unfed") == 1 or current_tile.get("cared_today")) and not current_tile.get("fed_today") and inventories[i].get("WHEAT", 0) > 0:
                         worker_actions.append(["FEED"])
                         #print('feed')

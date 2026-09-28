@@ -761,7 +761,9 @@ def agent(obs):
             None  # fallback if nothing is affordable, add to this for plants about to be harvested
             )
             if total_seeds_and_animals > empty_tiles:
-                if start_money > new_quadrant_costs[len(my_farm["unlocked_quadrants"]) + 1]:
+                if len(my_farm["unlocked_quadrants"]) < 3 and start_money > new_quadrant_costs[len(my_farm["unlocked_quadrants"]) + 1]:
+                    print(total_seeds_and_animals)
+                    print(empty_tiles)
                     market_orders.append(["BUY_LAND"])
                     empty_tiles += 25
                 else:

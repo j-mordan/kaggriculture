@@ -779,7 +779,7 @@ def agent(obs):
         product_revenue_per_day[product] = projected_prices[product] * projected_harvest[product] / product_lifespan[product] if product_lifespan[product] > 0 else 0
         product_values[product] = product_revenue_per_day[product] - product_cost_per_day[product]
 
-    quads_allowed = 2
+    quads_allowed = 3
     # 1. State Extraction & Tracking
     # Parse coordinates, tile statuses, cash, and shop multipliers
     farmer_pos = my_farm["farmer"]
@@ -1383,13 +1383,12 @@ def agent(obs):
                                     worker_actions.append(["PASS"])
                         elif (current_tile.get("consecutive_unfed") == 1 or current_tile.get("cared_today") or age == time_to_first_yield[current_tile.get("animal")] - 1) and not current_tile.get("fed_today") and inventories[i].get("WHEAT", 0) > 0:
                             worker_actions.append(["FEED"])
-                            #print('feed')
                         elif current_tile.get("fertilizer_available"):
                             worker_actions.append(["COLLECT_FERTILIZER"])
                         elif current_tile.get("animal") == "GOOSE":
                             if current_tile.get("yield_units") >= 4:
                                 worker_actions.append(["HARVEST"])
-                            elif (current_tile.get("pending_care_bonus") < 2  or age == time_to_first_yield[current_tile.get("animal")] - 1) and not current_tile.get("cared_today"):
+                            elif (current_tile.get("pending_care_bonus") < 3 or current_tile.get("fed_today")) and not current_tile.get("cared_today"):
                                 worker_actions.append(["CARE"])
                             elif current_tile.get("yield_units") > 0:
                                 worker_actions.append(["HARVEST"])
@@ -1401,7 +1400,7 @@ def agent(obs):
                         elif current_tile.get("animal") == "COW":
                             if current_tile.get("yield_units") >= 6:
                                 worker_actions.append(["HARVEST"])
-                            elif (current_tile.get("pending_care_bonus") < 4 or age == time_to_first_yield[current_tile.get("animal")] - 1) and not current_tile.get("cared_today"):
+                            elif (current_tile.get("pending_care_bonus") < 5 or current_tile.get("fed_today")) and not current_tile.get("cared_today"):
                                 worker_actions.append(["CARE"])
                             elif current_tile.get("yield_units") > 0:
                                 worker_actions.append(["HARVEST"])
@@ -1413,7 +1412,7 @@ def agent(obs):
                         elif current_tile.get("animal") == "SHEEP":
                             if current_tile.get("yield_units") >= 6:
                                 worker_actions.append(["HARVEST"])
-                            elif (current_tile.get("pending_care_bonus") < 4 or age == time_to_first_yield[current_tile.get("animal")] - 1) and not current_tile.get("cared_today"):
+                            elif (current_tile.get("pending_care_bonus") < 5 or current_tile.get("fed_today")) and not current_tile.get("cared_today"):
                                 worker_actions.append(["CARE"])
                             elif current_tile.get("yield_units") > 0:
                                 worker_actions.append(["HARVEST"])

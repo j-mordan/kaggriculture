@@ -374,7 +374,7 @@ def agent(obs):
                 max_harvest_size = max_harvest[tile.get("crop")]
                 first_yield_day = time_to_first_yield[tile.get("crop")]
                 lifespan = product_lifespan[tile.get("crop")]
-                if tile.get("yield_units") > 0:
+                if tile.get("yield_units") > 0 and age >= first_yield_day:
                     harvestable.append((x, y))
                 if tile.get("crop") == "WHEAT":
                     projected_produced["WHEAT"] += projected_harvest["WHEAT"]
@@ -535,14 +535,14 @@ def agent(obs):
                 continue
 
     current_demand_minus_projected_supply = {
-        "WHEAT" : daily_demand["WHEAT"] - projected_produced["WHEAT"],
-        "CARROT" : daily_demand["CARROT"] - projected_produced["CARROT"],
-        "MELON" : daily_demand["MELON"] - projected_produced["MELON"],
-        "TOMATO" : daily_demand["TOMATO"] - projected_produced["TOMATO"],
-        "STRAWBERRY" : daily_demand["STRAWBERRY"] - projected_produced["STRAWBERRY"],
-        "EGG" : daily_demand["EGG"] - projected_produced["EGG"],
-        "MILK" : daily_demand["MILK"] - projected_produced["MILK"],
-        "WOOL" : daily_demand["WOOL"] - projected_produced["WOOL"],
+        "WHEAT" : daily_demand["WHEAT"] * product_lifespan["WHEAT"] - projected_produced["WHEAT"],
+        "CARROT" : daily_demand["CARROT"] * product_lifespan["CARROT"] - projected_produced["CARROT"],
+        "MELON" : daily_demand["MELON"] * product_lifespan["MELON"] - projected_produced["MELON"],
+        "TOMATO" : daily_demand["TOMATO"] * product_lifespan["TOMATO"] - projected_produced["TOMATO"],
+        "STRAWBERRY" : daily_demand["STRAWBERRY"] * product_lifespan["STRAWBERRY"] - projected_produced["STRAWBERRY"],
+        "EGG" : daily_demand["EGG"] * product_lifespan["EGG"] - projected_produced["EGG"],
+        "MILK" : daily_demand["MILK"] * product_lifespan["MILK"] - projected_produced["MILK"],
+        "WOOL" : daily_demand["WOOL"] * product_lifespan["WOOL"] - projected_produced["WOOL"],
         "FERTILIZER" : daily_demand["FERTILIZER"] - projected_produced["FERTILIZER"]
     }
 
@@ -799,6 +799,9 @@ def agent(obs):
         market_orders.append(["SELL", "MILK", shed.get("MILK", 0)])
     if shed.get("WOOL", 0) > 0:
         market_orders.append(["SELL", "WOOL", shed.get("WOOL", 0)])
+    if hour == 1:
+        print('product_values:', product_values)
+        print(projected_produced["MELON"])
     if hour == 0:
         #print('product_values:', product_values)
         # e.g., buy seeds or hire hands at the start of a new day
@@ -895,7 +898,7 @@ def agent(obs):
         animals_in_shed = shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0)
         if day == 0:
             wheat_wanted *= 2
-        if total_animals + wheat_wanted + animals_in_shed > shed_contents["WHEAT"]:
+        if total_animals + wheat_wanted + animals_in_shed > shed_contents["WHEAT"] and day < 29:
             market_orders.append(["BUY_PRODUCT", "WHEAT", total_animals + wheat_wanted + animals_in_shed - shed_contents["WHEAT"]])
         if wheat_seed_wanted > 0:
             market_orders.append(["BUY_SEED", "WHEAT", wheat_seed_wanted])
@@ -914,7 +917,7 @@ def agent(obs):
             #if my_farm["money"] >= 200 and seeds.get("MELON", 0) < 5:
             #    market_orders.append(["BUY_SEED", "MELON", 5])
         if day == 29:
-            for _ in range(10 - my_farm.get("hires_today", 0)):
+            for _ in range(len(my_farm["unlocked_quadrants"]) * 4 - my_farm.get("hires_today", 0)):
                 market_orders.append(["HIRE"])
             worker_actions.append(["HARVEST"])
         else:
@@ -931,12 +934,13 @@ def agent(obs):
     # Determine what the farmer standing on (farmer_pos[0], farmer_pos[1]) needs to do
     elif hour < 24:
         if day == 29:
-            for _ in range(10 - my_farm.get("hires_today", 0)):
+            for _ in range(len(my_farm["unlocked_quadrants"]) * 4 - my_farm.get("hires_today", 0)):
                 market_orders.append(["HIRE"])
             HOURS_IN_DAY = 24
             hours_left = (HOURS_IN_DAY - 1) - hour
             total_workers = len(hands_list) + 1
-
+            if shed.get("WHEAT", 0) > 0:
+                market_orders.append(["SELL", "WHEAT", shed.get("WHEAT")])
             # 1. Normalize shed adjacent tiles for set lookup
             shed_adjacent_set = {tuple(t) for t in shed_adjacent_tiles}
 
@@ -950,44 +954,52 @@ def agent(obs):
                 dist_to_shed = abs(current_pos[0] - closest_drop[0]) + abs(current_pos[1] - closest_drop[1])
 
                 # Hard curfew: walk distance + 1 turn to drop + 1 buffer
-                must_return = hours_left <= (dist_to_shed + 2)
-
-                # Check if this worker can claim a crop
-                chosen_crop = None
-                if not must_return and len(unclaimed_crops) > 0:
-                    # Find the crop closest to THIS worker's current coordinates
-                    chosen_crop = min(
-                        unclaimed_crops,
-                        key=lambda c: abs(c[0] - current_pos[0]) + abs(c[1] - current_pos[1])
-                    )
-                    # Remove immediately so subsequent workers in this loop cannot pick it
-                    unclaimed_crops.remove(chosen_crop)
-
-                # --- EXECUTE ACTIONS ---
-                # Case A: Return to shed (curfew reached OR no crops left to claim)
-                if chosen_crop is None:
-                    if current_pos not in shed_adjacent_set:
-                        worker_actions.append(step_toward(current_pos, closest_drop))
-                    else:
-                        worker_actions.append(["DROP"])
-
-                # Case B: Go to or harvest the claimed crop
+                must_return = hours_left <= (dist_to_shed + 3)
+                if i == 0 and hour < 8:
+                    worker_actions.append(step_toward(current_pos, (0, 0)))
+                elif i == 1 and hour < 8:
+                    worker_actions.append(step_toward(current_pos, (9, 0)))
                 else:
-                    if current_pos == chosen_crop:
-                        worker_actions.append(["HARVEST"])
-                        # Remove from global harvestable list since it is harvested this tick
-                        if chosen_crop in harvestable:
-                            harvestable.remove(chosen_crop)
-                        elif list(chosen_crop) in harvestable:
-                            harvestable.remove(list(chosen_crop))
+                    # Check if this worker can claim a crop
+                    chosen_crop = None
+                    if not must_return and len(unclaimed_crops) > 0:
+                        # Find the crop closest to THIS worker's current coordinates
+                        chosen_crop = min(
+                            unclaimed_crops,
+                            key=lambda c: abs(c[0] - current_pos[0]) + abs(c[1] - current_pos[1])
+                        )
+                        # Remove immediately so subsequent workers in this loop cannot pick it
+                        unclaimed_crops.remove(chosen_crop)
+
+                    # --- EXECUTE ACTIONS ---
+                    # Case A: Return to shed (curfew reached OR no crops left to claim)
+                    if chosen_crop is None:
+                        if current_pos not in shed_adjacent_set:
+                            worker_actions.append(step_toward(current_pos, closest_drop))
+                        else:
+                            worker_actions.append(["DROP"])
+
+                    # Case B: Go to or harvest the claimed crop
                     else:
-                        move = step_toward(current_pos, chosen_crop)
-                        worker_actions.append(move)
+                        if current_pos == chosen_crop:
+                            worker_actions.append(["HARVEST"])
+                            # Remove from global harvestable list since it is harvested this tick
+                            if chosen_crop in harvestable:
+                                harvestable.remove(chosen_crop)
+                            elif list(chosen_crop) in harvestable:
+                                harvestable.remove(list(chosen_crop))
+                        else:
+                            move = step_toward(current_pos, chosen_crop)
+                            worker_actions.append(move)
 
 
         else:
             for i in range(len(my_farm["unlocked_quadrants"]) * 5 - 1 - my_farm.get("hires_today", 0)):
                 market_orders.append(["HIRE"])
+            for i in range(len(hands_list) + 1):
+                held_animals_rn = inventories[i].get("COW", 0) + inventories[i].get("SHEEP", 0) + inventories[i].get("GOOSE", 0)
+            if shed.get("WHEAT", 0) > 0:
+                market_orders.append(["SELL", "WHEAT", shed.get("WHEAT", 0) - sum(animals_in_col.values()) - held_animals_rn - shed.get("GOOSE", 0) - shed.get("COW", 0) - shed.get("SHEEP", 0)])
             wheat_seed_wanted = 0
             carrot_seed_wanted = 0
             melon_seed_wanted = 0
@@ -1165,7 +1177,6 @@ def agent(obs):
                         worker_actions.append(["PICKUP", "SHEEP", min(2, empty_tiles_in_col[farmer_col[i]]  + empty_pastures_in_col[farmer_col[i]], shed.get("SHEEP", 0))])
                         held_animals = min(math.ceil(animals_in_shed // 5), empty_tiles_in_col[farmer_col[i]]  + empty_pastures_in_col[farmer_col[i]], shed.get("SHEEP", 0))
                         '''
-                    
                 else:
                     if current_tile == None:
                         if current_x + current_y >= 6:
@@ -1316,7 +1327,7 @@ def agent(obs):
                                 else:
                                     worker_actions.append(["PASS"])
                         elif current_tile.get("crop") == "STRAWBERRY":
-                            if age in {9, 10, 11, 12, 13, 14, 15}: #bonus window of strawberry
+                            if age in {9, 10, 11, 12, 13, 14, 15, 16}: #bonus window of strawberry
                                 if (age >= lifespan and current_tile.get("yield_units") > 0) or (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
                                     worker_actions.append(["HARVEST"])
                                 elif not current_tile.get("watered_today") and age < lifespan:

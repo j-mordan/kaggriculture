@@ -65,22 +65,47 @@ def predict_price(
 
 def build_chunks(products, seed_cost, prices, projected_harvest, projected_inventory,
                   base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
-                  product_lifespan, product_cost_per_day, budget, max_units):
+                  product_lifespan, product_cost_per_day, budget, max_units,
+                  day, time_to_first_yield):
     """One chunk per potential purchase: (product, cost, marginal_daily_profit).
     Values are strictly non-increasing per product because buying more pushes
     its price down via predict_price, mirroring what update_value already does."""
     chunks = []
+
+    # per-product day deadlines: no point buying something that can never
+    # reach its first harvest before day 30
+    animal_cutoffs = {"EGG": 26, "MILK": 22, "WOOL": 24}
+
     for p in products:
+        if p in animal_cutoffs:
+            if day >= animal_cutoffs[p]:
+                continue
+        else:
+            if 30 - day <= time_to_first_yield[p]:
+                continue
+
         inv = projected_inventory[p]
         extra = prices["WHEAT"] if p in ("EGG", "MILK", "WOOL") else 0
         cost = seed_cost[p] + extra
         if cost > budget or product_lifespan[p] <= 0:
             continue
+
+        # fertilizer byproduct revenue for animals -- static snapshot, matches
+        # how product_revenue_per_day computed it (not re-simulated per purchase)
+        fert_bonus = 0.0
+        if p in ("EGG", "MILK", "WOOL") and day < 30:
+            fert_price = predict_price(
+                projected_inventory["FERTILIZER"], base_costs["FERTILIZER"], T_values["FERTILIZER"],
+                below_funcs["FERTILIZER"], below_targets["FERTILIZER"],
+                above_funcs["FERTILIZER"], above_targets["FERTILIZER"]
+            )
+            fert_bonus = fert_price * projected_harvest["FERTILIZER"] / product_lifespan["FERTILIZER"]
+
         for _unit in range(max_units):
             inv += projected_harvest[p]
             price = predict_price(inv, base_costs[p], T_values[p], below_funcs[p],
                                    below_targets[p], above_funcs[p], above_targets[p])
-            rev = price * projected_harvest[p] / product_lifespan[p]
+            rev = price * projected_harvest[p] / product_lifespan[p] + fert_bonus
             value = rev - product_cost_per_day[p]
             if value <= 0:
                 break
@@ -966,7 +991,7 @@ def agent(obs):
         return closest_tile
 
     def update_value(product):
-        projected_inventory[product] += projected_harvest[product] #note: if the opponent has a competent model, they will also buy this crop. It is possible that this will have to be weighted so that the expected inventory is increased greater than if only i bought this product
+        projected_inventory[product] += int(projected_harvest[product] * 1.5) #note: if the opponent has a competent model, they will also buy this crop. It is possible that this will have to be weighted so that the expected inventory is increased greater than if only i bought this product
         projected_prices[product] = predict_price(projected_inventory[product], base_costs[product], T_values[product], below_funcs[product], below_targets[product], above_funcs[product], above_targets[product])
         product_revenue_per_day[product] = projected_prices[product] * projected_harvest[product] / product_lifespan[product] if product_lifespan[product] > 0 else 0
         product_values[product] = product_revenue_per_day[product] - product_cost_per_day[product]
@@ -1028,27 +1053,28 @@ def agent(obs):
         while affordable:
             budget = max(0, int(start_money))
             chunks = build_chunks(
-                list(product_values.keys()), seed_cost, prices, projected_harvest, projected_inventory,
-                base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
-                product_lifespan, product_cost_per_day, budget, max_units=empty_tiles
+            list(product_values.keys()), seed_cost, prices, projected_harvest, projected_inventory,
+            base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
+            product_lifespan, product_cost_per_day, budget, max_units=empty_tiles,
+            day=day, time_to_first_yield=time_to_first_yield
             )
             bought, total_daily_profit, total_cost = solve_allocation_np(chunks, budget, empty_tiles)
             total_wanted = bought.get("WHEAT", 0) + bought.get("CARROT", 0) + bought.get("MELON", 0) + bought.get("TOMATO", 0) + bought.get("STRAWBERRY", 0) + bought.get("EGG", 0) + bought.get("MILK", 0) + bought.get("WOOL", 0)
-            if empty_tiles - total_wanted <= 0 and unlocked_quads < quads_allowed and start_money - total_cost > new_quadrant_costs[unlocked_quads + 1] and hour < 15:
+            if empty_tiles - total_wanted <= 0 and unlocked_quads < quads_allowed and start_money - total_cost > new_quadrant_costs[unlocked_quads + 1] + cost_of_n_farmers[(unlocked_quads + 1) * 5 + 1] + 100 and hour < 10:
                 unlocked_quads += 1
                 market_orders.append(["BUY_LAND"])
                 empty_tiles += 25
-                start_money -= new_quadrant_costs[unlocked_quads + 1]
+                start_money -= (new_quadrant_costs[unlocked_quads] + cost_of_n_farmers[unlocked_quads * 5 + 1])
             else:
                 affordable = False
-        wheat_seed_wanted = bought.get("WHEAT", 0) - seeds.get("WHEAT", 0)
-        carrot_seed_wanted = bought.get("CARROT", 0) - seeds.get("CARROT", 0)
-        melon_seed_wanted = bought.get("MELON", 0) - seeds.get("MELON", 0)
-        tomato_seed_wanted = bought.get("TOMATO", 0) - seeds.get("TOMATO", 0)
-        strawberry_seed_wanted = bought.get("STRAWBERRY", 0) - seeds.get("STRAWBERRY", 0)
-        goose_wanted = bought.get("EGG", 0) - shed.get("GOOSE", 0)
-        cow_wanted = bought.get("MILK", 0) - shed.get("COW", 0)
-        sheep_wanted = bought.get("WOOL", 0) - shed.get("SHEEP", 0)
+        wheat_seed_wanted = bought.get("WHEAT", 0)
+        carrot_seed_wanted = bought.get("CARROT", 0)
+        melon_seed_wanted = bought.get("MELON", 0)
+        tomato_seed_wanted = bought.get("TOMATO", 0)
+        strawberry_seed_wanted = bought.get("STRAWBERRY", 0)
+        goose_wanted = bought.get("EGG", 0)
+        cow_wanted = bought.get("MILK", 0)
+        sheep_wanted = bought.get("WOOL", 0)
 
         if goose_wanted > 0:
             market_orders.append(["BUY_ANIMAL", "GOOSE", goose_wanted])
@@ -1170,12 +1196,14 @@ def agent(obs):
         else:
             if day == 10:
                 for i in range(len(my_farm["unlocked_quadrants"]) * 5 - my_farm.get("hires_today", 0)):
-                    market_orders.append(["HIRE"])
+                    if hour < 11:
+                        market_orders.append(["HIRE"])
                 farmer_col[len(my_farm["unlocked_quadrants"]) * 5] = farmer_col[5]
                 farmer_col[5] = farmer_col[0]
             else:
                 for i in range(len(my_farm["unlocked_quadrants"]) * 5 - 1 - my_farm.get("hires_today", 0)):
-                    market_orders.append(["HIRE"])
+                    if hour < 11:
+                        market_orders.append(["HIRE"])
             held_animals_rn = 0
             for i in range(len(hands_list) + 1):
                 held_animals_rn += inventories[i].get("COW", 0) + inventories[i].get("SHEEP", 0) + inventories[i].get("GOOSE", 0)
@@ -1196,28 +1224,29 @@ def agent(obs):
             while affordable:
                 budget = max(0, int(start_money))
                 chunks = build_chunks(
-                    list(product_values.keys()), seed_cost, prices, projected_harvest, projected_inventory,
-                    base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
-                    product_lifespan, product_cost_per_day, budget, max_units=empty_tiles
+                list(product_values.keys()), seed_cost, prices, projected_harvest, projected_inventory,
+                base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
+                product_lifespan, product_cost_per_day, budget, max_units=empty_tiles,
+                day=day, time_to_first_yield=time_to_first_yield
                 )
                 bought, total_daily_profit, total_cost = solve_allocation_np(chunks, budget, empty_tiles)
                 total_wanted = bought.get("WHEAT", 0) + bought.get("CARROT", 0) + bought.get("MELON", 0) + bought.get("TOMATO", 0) + bought.get("STRAWBERRY", 0) + bought.get("EGG", 0) + bought.get("MILK", 0) + bought.get("WOOL", 0)
-                if empty_tiles - total_wanted <= 0 and unlocked_quads < quads_allowed and start_money - total_cost > new_quadrant_costs[unlocked_quads + 1] and hour < 15:
+                if empty_tiles - total_wanted <= 0 and unlocked_quads < quads_allowed and start_money - total_cost > new_quadrant_costs[unlocked_quads + 1]  + cost_of_n_farmers[(unlocked_quads + 1) * 5 + 1] + 100 and hour < 10:
                     unlocked_quads += 1
                     market_orders.append(["BUY_LAND"])
                     empty_tiles += 25
-                    start_money -= new_quadrant_costs[unlocked_quads + 1]
+                    start_money -= (new_quadrant_costs[unlocked_quads] + cost_of_n_farmers[unlocked_quads * 5 + 1])
                 else:
                     affordable = False
     
-            wheat_seed_wanted = bought.get("WHEAT", 0) - seeds.get("WHEAT", 0)
-            carrot_seed_wanted = bought.get("CARROT", 0) - seeds.get("CARROT", 0)
-            melon_seed_wanted = bought.get("MELON", 0) - seeds.get("MELON", 0)
-            tomato_seed_wanted = bought.get("TOMATO", 0) - seeds.get("TOMATO", 0)
-            strawberry_seed_wanted = bought.get("STRAWBERRY", 0) - seeds.get("STRAWBERRY", 0)
-            goose_wanted = bought.get("EGG", 0) - shed.get("GOOSE", 0)
-            cow_wanted = bought.get("MILK", 0) - shed.get("COW", 0)
-            sheep_wanted = bought.get("WOOL", 0) - shed.get("SHEEP", 0)
+            wheat_seed_wanted = bought.get("WHEAT", 0)
+            carrot_seed_wanted = bought.get("CARROT", 0)
+            melon_seed_wanted = bought.get("MELON", 0)
+            tomato_seed_wanted = bought.get("TOMATO", 0)
+            strawberry_seed_wanted = bought.get("STRAWBERRY", 0)
+            goose_wanted = bought.get("EGG", 0)
+            cow_wanted = bought.get("MILK", 0)
+            sheep_wanted = bought.get("WOOL", 0)
 
             if wheat_seed_wanted > 0:
                 market_orders.append(["BUY_SEED", "WHEAT", wheat_seed_wanted])
@@ -1260,13 +1289,14 @@ def agent(obs):
             for i in range(len(hands_list) + 1):
                 if day == 10 and i == 0:
                     current_x, current_y = farmer_pos
-                    print(farmer_pos)
                     current_tile = my_tiles[current_y][current_x]
                     if current_tile != None and current_tile.get("watered_today", True) and current_tile.get("yield_units", 0) >= 6 and farmer_pos in [[2, 4], [3, 4], [4, 4], [3, 3], [4, 3], [4, 2]]:
                         worker_actions.append(["HARVEST"])
                     elif current_tile != None and not current_tile.get("watered_today", True) and farmer_pos in [[2, 4], [3, 4], [4, 4], [3, 3], [4, 3], [4, 2]]:
                         worker_actions.append(["WATER"])
-                    elif inventories[i].get("MELON", 0) < 36:
+                    elif farmer_pos == [4, 4] and inventories[i].get("MELON", 0) >= 6:
+                        worker_actions.append(["DROP"])
+                    elif inventories[i].get("MELON", 0) < 30:
                         if current_x == 4 and current_y > 2:
                             worker_actions.append(["NORTH"])
                         elif current_x == 4 and current_y <= 2:
@@ -1277,7 +1307,7 @@ def agent(obs):
                             worker_actions.append(["WEST"])
                     else:
                         if farmer_pos != [4, 4]:
-                            worker_actions.append(step_toward(farmer_pos, (4, 4)))
+                            worker_actions.append(["EAST"])
                         else:
                             worker_actions.append(["DROP"])
                     
@@ -1495,7 +1525,7 @@ def agent(obs):
                                         worker_actions.append(["PASS"])
                             elif current_tile.get("crop") == "TOMATO":
                                 if age in {7, 8, 9, 10, 11}: #bonus window of tomato
-                                    if (age >= lifespan and current_tile.get("yield_units") > 0) or (current_tile.get("yield_units") >= max_harvest_size - 1 and age >= first_yield_day):
+                                    if (age >= lifespan and current_tile.get("yield_units") > 0) or (current_tile.get("yield_units") > 0 and age >= first_yield_day):
                                         worker_actions.append(["HARVEST"])
                                     elif not current_tile.get("watered_today") and age < 11:
                                         worker_actions.append(["WATER"])
@@ -1516,7 +1546,7 @@ def agent(obs):
                                         worker_actions.append(["PASS"])
                             elif current_tile.get("crop") == "STRAWBERRY":
                                 if age in {9, 10, 11, 12, 13, 14, 15, 16}: #bonus window of strawberry
-                                    if (age >= lifespan and current_tile.get("yield_units") > 0) or (current_tile.get("yield_units") >= max_harvest_size - 1 and age >= first_yield_day):
+                                    if (age >= lifespan and current_tile.get("yield_units") > 0) or (current_tile.get("yield_units") > 0 and age >= first_yield_day):
                                         worker_actions.append(["HARVEST"])
                                     elif not current_tile.get("watered_today") and age < lifespan:
                                         worker_actions.append(["WATER"])

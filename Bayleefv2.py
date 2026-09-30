@@ -991,7 +991,7 @@ def agent(obs):
         return closest_tile
 
     def update_value(product):
-        projected_inventory[product] += int(projected_harvest[product] * 1.5) #note: if the opponent has a competent model, they will also buy this crop. It is possible that this will have to be weighted so that the expected inventory is increased greater than if only i bought this product
+        projected_inventory[product] += projected_harvest[product] #note: if the opponent has a competent model, they will also buy this crop. It is possible that this will have to be weighted so that the expected inventory is increased greater than if only i bought this product
         projected_prices[product] = predict_price(projected_inventory[product], base_costs[product], T_values[product], below_funcs[product], below_targets[product], above_funcs[product], above_targets[product])
         product_revenue_per_day[product] = projected_prices[product] * projected_harvest[product] / product_lifespan[product] if product_lifespan[product] > 0 else 0
         product_values[product] = product_revenue_per_day[product] - product_cost_per_day[product]
@@ -1075,6 +1075,12 @@ def agent(obs):
         goose_wanted = bought.get("EGG", 0)
         cow_wanted = bought.get("MILK", 0)
         sheep_wanted = bought.get("WOOL", 0)
+        if day == 0:
+            cow_wanted -= 1
+            sheep_wanted += 1
+            melon_seed_wanted -= 5
+            wheat_seed_wanted += 4
+            goose_wanted += 1
 
         if goose_wanted > 0:
             market_orders.append(["BUY_ANIMAL", "GOOSE", goose_wanted])
@@ -1296,6 +1302,7 @@ def agent(obs):
                         worker_actions.append(["WATER"])
                     elif farmer_pos == [4, 4] and inventories[i].get("MELON", 0) >= 6:
                         worker_actions.append(["DROP"])
+                        market_orders.append(["SELL", "MELON", 6])
                     elif inventories[i].get("MELON", 0) < 30:
                         if current_x == 4 and current_y > 2:
                             worker_actions.append(["NORTH"])
@@ -1310,6 +1317,7 @@ def agent(obs):
                             worker_actions.append(["EAST"])
                         else:
                             worker_actions.append(["DROP"])
+                            market_orders.append(["SELL", "MELON", 30])
                     
                 else:
                     held_animals = inventories[i].get("COW", 0) + inventories[i].get("SHEEP", 0) + inventories[i].get("GOOSE", 0)
@@ -1330,57 +1338,56 @@ def agent(obs):
                         else:
                             cow_or_sheep_needed[farmer_col[j]] -= inventories[j].get("COW", 0) + inventories[j].get("SHEEP", 0)
                     desired_col, r = farmer_col[i]
-                    if current_x != desired_col:
-                        g_needed = goose_needed[farmer_col[i]]
-                        goose_needed[farmer_col[i]] = 0
-                        c_s_needed = cow_or_sheep_needed[farmer_col[i]]
-                        cow_or_sheep_needed[farmer_col[i]] = 0
-                        other = animals_needed[farmer_col[i]]
-                        animals_needed[farmer_col[i]] = 0
-                        if shed_contents["GOOSE"] > 0 and g_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                            worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), g_needed + other)])
-                            shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), g_needed + other)
-                        elif shed_contents["COW"] > 0 and c_s_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                            worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)])
-                            shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)
-                        elif shed_contents["SHEEP"] > 0 and c_s_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                            worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)])
-                            shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)
-                        elif other > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                            if shed_contents["GOOSE"] - sum(goose_needed.values()) >= other:
-                                worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)])
-                                shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)
-                            elif shed_contents["COW"] - sum(cow_or_sheep_needed.values()) >= other:
-                                worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)])
-                                shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)
-                            elif shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= other:
-                                worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)])
-                                shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)
-                            elif shed_contents["GOOSE"] - sum(goose_needed.values()) > 0:
-                                worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)])
-                                shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)
-                            elif shed_contents["COW"] - sum(cow_or_sheep_needed.values()) >= 0:
-                                worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)])
-                                shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)
-                            elif shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= 0:
-                                worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)])
-                                shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)
-                            elif shed_contents["COW"] + shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= 0:
-                                if shed_contents["COW"] > shed_contents["SHEEP"]:
-                                        worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"], other)])
-                                        shed_contents["COW"] -= min(shed_contents["COW"], other)
-                                else:
-                                    worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"], other)])
-                                    shed_contents["SHEEP"] -= min(shed_contents["SHEEP"], other)
+                    g_needed = goose_needed[farmer_col[i]]
+                    goose_needed[farmer_col[i]] = 0
+                    c_s_needed = cow_or_sheep_needed[farmer_col[i]]
+                    cow_or_sheep_needed[farmer_col[i]] = 0
+                    other = animals_needed[farmer_col[i]]
+                    animals_needed[farmer_col[i]] = 0
+                    if shed_contents["GOOSE"] > 0 and g_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), g_needed + other)])
+                        shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), g_needed + other)
+                    elif shed_contents["COW"] > 0 and c_s_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)])
+                        shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)
+                    elif shed_contents["SHEEP"] > 0 and c_s_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)])
+                        shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)
+                    elif other > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                        if shed_contents["GOOSE"] - sum(goose_needed.values()) >= other:
+                            worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)])
+                            shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)
+                        elif shed_contents["COW"] - sum(cow_or_sheep_needed.values()) >= other:
+                            worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)])
+                            shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)
+                        elif shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= other:
+                            worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)])
+                            shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)
+                        elif shed_contents["GOOSE"] - sum(goose_needed.values()) > 0:
+                            worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)])
+                            shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)
+                        elif shed_contents["COW"] - sum(cow_or_sheep_needed.values()) >= 0:
+                            worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)])
+                            shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)
+                        elif shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= 0:
+                            worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)])
+                            shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)
+                        elif shed_contents["COW"] + shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= 0:
+                            if shed_contents["COW"] > shed_contents["SHEEP"]:
+                                    worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"], other)])
+                                    shed_contents["COW"] -= min(shed_contents["COW"], other)
                             else:
-                                worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                        elif (current_x, current_y) in shed_adjacent_tiles and inventories[i].get("WHEAT", 0) < held_animals + animals_in_col[farmer_col[i]] and shed.get("WHEAT", 0) > 0:
-                            worker_actions.append(["PICKUP", "WHEAT", min(shed.get("WHEAT", 0), held_animals + animals_in_col[farmer_col[i]] - inventories[i].get("WHEAT", 0))])
-                        elif len(fert_needed_in_col[farmer_col[i]]) - inventories[i].get("FERTILIZER", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles and shed.get("FERTILIZER", 0) > 0:
-                            worker_actions.append(["PICKUP", "FERTILIZER", min(shed.get("FERTILIZER", 0), len(fert_needed_in_col[farmer_col[i]]) - inventories[i].get("FERTILIZER", 0))])
-                            #print('pick up stix')
-                        else: 
+                                worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"], other)])
+                                shed_contents["SHEEP"] -= min(shed_contents["SHEEP"], other)
+                        else:
                             worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                    elif (current_x, current_y) in shed_adjacent_tiles and inventories[i].get("WHEAT", 0) < held_animals + animals_in_col[farmer_col[i]] and shed.get("WHEAT", 0) > 0:
+                        worker_actions.append(["PICKUP", "WHEAT", min(shed.get("WHEAT", 0), held_animals + animals_in_col[farmer_col[i]] - inventories[i].get("WHEAT", 0))])
+                    elif len(fert_needed_in_col[farmer_col[i]]) - inventories[i].get("FERTILIZER", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles and shed.get("FERTILIZER", 0) > 0:
+                        worker_actions.append(["PICKUP", "FERTILIZER", min(shed.get("FERTILIZER", 0), len(fert_needed_in_col[farmer_col[i]]) - inventories[i].get("FERTILIZER", 0))])
+                        #print('pick up stix')
+                    elif current_x != desired_col: 
+                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
                         '''
                         if shed.get("GOOSE", 0) > 0 and empty_tiles_in_col[farmer_col[i]] + empty_coops_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
                             worker_actions.append(["PICKUP", "GOOSE", min(2, empty_tiles_in_col[farmer_col[i]] + empty_coops_in_col[farmer_col[i]], shed.get("GOOSE", 0))])

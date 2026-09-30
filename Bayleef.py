@@ -1308,7 +1308,7 @@ def agent(obs):
                         worker_actions.append(["PICKUP", "WHEAT", min(shed.get("WHEAT", 0), held_animals + animals_in_col[farmer_col[i]] - inventories[i].get("WHEAT", 0))])
                     elif len(fert_needed_in_col[farmer_col[i]]) - inventories[i].get("FERTILIZER", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles and shed.get("FERTILIZER", 0) > 0:
                         worker_actions.append(["PICKUP", "FERTILIZER", min(shed.get("FERTILIZER", 0), len(fert_needed_in_col[farmer_col[i]]) - inventories[i].get("FERTILIZER", 0))])
-                        print('pick up stix')
+                        #print('pick up stix')
                     else: 
                         worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
                     '''

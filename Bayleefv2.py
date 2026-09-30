@@ -121,12 +121,13 @@ def solve_allocation_np(chunks, budget, tiles):
 
     bought = defaultdict(int)
     t, b = int(best_t), int(best_b)
+    total_cost = int(best_b)
     while picked[t, b] != -1:
         idx = int(picked[t, b])
         p, cost, value = chunks[idx]
         bought[p] += 1
         t, b = t - 1, b - int(round(cost))
-    return bought, float(best_v)
+    return bought, float(best_v), total_cost
 
 def agent(obs):
     """
@@ -1024,14 +1025,22 @@ def agent(obs):
         start_money = max(0, my_farm["money"] - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 2 - prices["WHEAT"] * (animals_my_farm + held_animals_rn + animals_in_shed_rn) * (2 if day == 0 else 1))
         unlocked_quads = len(my_farm["unlocked_quadrants"])
         affordable = True
-        budget = max(0, int(start_money))
-        chunks = build_chunks(
-            list(product_values.keys()), seed_cost, prices, projected_harvest, projected_inventory,
-            base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
-            product_lifespan, product_cost_per_day, budget, max_units=empty_tiles
-        )
-        bought, total_daily_profit = solve_allocation_np(chunks, budget, empty_tiles)
-
+        while affordable:
+            budget = max(0, int(start_money))
+            chunks = build_chunks(
+                list(product_values.keys()), seed_cost, prices, projected_harvest, projected_inventory,
+                base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
+                product_lifespan, product_cost_per_day, budget, max_units=empty_tiles
+            )
+            bought, total_daily_profit, total_cost = solve_allocation_np(chunks, budget, empty_tiles)
+            total_wanted = bought.get("WHEAT", 0) + bought.get("CARROT", 0) + bought.get("MELON", 0) + bought.get("TOMATO", 0) + bought.get("STRAWBERRY", 0) + bought.get("EGG", 0) + bought.get("MILK", 0) + bought.get("WOOL", 0)
+            if empty_tiles - total_wanted <= 0 and unlocked_quads < quads_allowed and start_money - total_cost > new_quadrant_costs[unlocked_quads + 1] and hour < 15:
+                unlocked_quads += 1
+                market_orders.append(["BUY_LAND"])
+                empty_tiles += 25
+                start_money -= new_quadrant_costs[unlocked_quads + 1]
+            else:
+                affordable = False
         wheat_seed_wanted = bought.get("WHEAT", 0) - seeds.get("WHEAT", 0)
         carrot_seed_wanted = bought.get("CARROT", 0) - seeds.get("CARROT", 0)
         melon_seed_wanted = bought.get("MELON", 0) - seeds.get("MELON", 0)
@@ -1076,12 +1085,18 @@ def agent(obs):
                 market_orders.append(["HIRE"])
             worker_actions.append(["HARVEST"])
         else:
-            for i in range(len(my_farm["unlocked_quadrants"]) * 5 - 1 - my_farm.get("hires_today", 0)):
-                market_orders.append(["HIRE"])
+            if day == 10:
+                for i in range(len(my_farm["unlocked_quadrants"]) * 5 - my_farm.get("hires_today", 0)):
+                    market_orders.append(["HIRE"])
+            else:
+                for i in range(len(my_farm["unlocked_quadrants"]) * 5 - 1 - my_farm.get("hires_today", 0)):
+                    market_orders.append(["HIRE"])
 
         #market_orders.append(["BUY_SEED", "WHEAT", 10])
         current_x, current_y = farmer_pos
-        if current_x != 0:
+        if day == 10:
+            worker_actions.append(["WATER"])
+        elif current_x != 0:
             worker_actions.append(["PASS"]) #why not move
         #print(market_orders)
 
@@ -1153,8 +1168,14 @@ def agent(obs):
 
 
         else:
-            for i in range(len(my_farm["unlocked_quadrants"]) * 5 - 1 - my_farm.get("hires_today", 0)):
-                market_orders.append(["HIRE"])
+            if day == 10:
+                for i in range(len(my_farm["unlocked_quadrants"]) * 5 - my_farm.get("hires_today", 0)):
+                    market_orders.append(["HIRE"])
+                farmer_col[len(my_farm["unlocked_quadrants"]) * 5] = farmer_col[5]
+                farmer_col[5] = farmer_col[0]
+            else:
+                for i in range(len(my_farm["unlocked_quadrants"]) * 5 - 1 - my_farm.get("hires_today", 0)):
+                    market_orders.append(["HIRE"])
             held_animals_rn = 0
             for i in range(len(hands_list) + 1):
                 held_animals_rn += inventories[i].get("COW", 0) + inventories[i].get("SHEEP", 0) + inventories[i].get("GOOSE", 0)
@@ -1172,13 +1193,22 @@ def agent(obs):
             start_money = max(0, my_farm["money"] - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 2 - prices["WHEAT"] * (animals_my_farm + held_animals_rn + animals_in_shed_rn) * (2 if day == 0 else 0))
             unlocked_quads = len(my_farm["unlocked_quadrants"])
             affordable = True
-            budget = max(0, int(start_money))
-            chunks = build_chunks(
-                list(product_values.keys()), seed_cost, prices, projected_harvest, projected_inventory,
-                base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
-                product_lifespan, product_cost_per_day, budget, max_units=empty_tiles
-            )
-            bought, total_daily_profit = solve_allocation_np(chunks, budget, empty_tiles)
+            while affordable:
+                budget = max(0, int(start_money))
+                chunks = build_chunks(
+                    list(product_values.keys()), seed_cost, prices, projected_harvest, projected_inventory,
+                    base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
+                    product_lifespan, product_cost_per_day, budget, max_units=empty_tiles
+                )
+                bought, total_daily_profit, total_cost = solve_allocation_np(chunks, budget, empty_tiles)
+                total_wanted = bought.get("WHEAT", 0) + bought.get("CARROT", 0) + bought.get("MELON", 0) + bought.get("TOMATO", 0) + bought.get("STRAWBERRY", 0) + bought.get("EGG", 0) + bought.get("MILK", 0) + bought.get("WOOL", 0)
+                if empty_tiles - total_wanted <= 0 and unlocked_quads < quads_allowed and start_money - total_cost > new_quadrant_costs[unlocked_quads + 1] and hour < 15:
+                    unlocked_quads += 1
+                    market_orders.append(["BUY_LAND"])
+                    empty_tiles += 25
+                    start_money -= new_quadrant_costs[unlocked_quads + 1]
+                else:
+                    affordable = False
     
             wheat_seed_wanted = bought.get("WHEAT", 0) - seeds.get("WHEAT", 0)
             carrot_seed_wanted = bought.get("CARROT", 0) - seeds.get("CARROT", 0)
@@ -1227,96 +1257,143 @@ def agent(obs):
                     animals_needed[(col, 9)] += 1
                 animals_in_shed -= 1
                 empty_tile_list.remove((col, row))
-            
             for i in range(len(hands_list) + 1):
-                held_animals = inventories[i].get("COW", 0) + inventories[i].get("SHEEP", 0) + inventories[i].get("GOOSE", 0)
-                if i == 0:
+                if day == 10 and i == 0:
                     current_x, current_y = farmer_pos
-                else:
-                    current_x, current_y = hands_list[i - 1]
-                current_tile = my_tiles[current_y][current_x]
-                for j in range(len(hands_list) + 1):
-                    if goose_needed[farmer_col[j]] - inventories[j].get("GOOSE", 0) <= 0:
-                        animals_needed[farmer_col[j]] -= inventories[j].get("GOOSE", 0) - goose_needed[farmer_col[j]]
-                        goose_needed[farmer_col[j]] = 0
+                    print(farmer_pos)
+                    current_tile = my_tiles[current_y][current_x]
+                    if current_tile != None and current_tile.get("watered_today", True) and current_tile.get("yield_units", 0) >= 6 and farmer_pos in [[2, 4], [3, 4], [4, 4], [3, 3], [4, 3], [4, 2]]:
+                        worker_actions.append(["HARVEST"])
+                    elif current_tile != None and not current_tile.get("watered_today", True) and farmer_pos in [[2, 4], [3, 4], [4, 4], [3, 3], [4, 3], [4, 2]]:
+                        worker_actions.append(["WATER"])
+                    elif inventories[i].get("MELON", 0) < 36:
+                        if current_x == 4 and current_y > 2:
+                            worker_actions.append(["NORTH"])
+                        elif current_x == 4 and current_y <= 2:
+                            worker_actions.append(["WEST"])
+                        elif current_x == 3 and current_y < 4:
+                            worker_actions.append(["SOUTH"])
+                        elif current_x == 3 and current_y >= 4:
+                            worker_actions.append(["WEST"])
                     else:
-                        goose_needed[farmer_col[j]] -= inventories[j].get("GOOSE", 0)
-                    if cow_or_sheep_needed[farmer_col[j]] - inventories[j].get("COW", 0) - inventories[j].get("SHEEP", 0) <= 0:
-                        animals_needed[farmer_col[j]] -= inventories[j].get("COW", 0) + inventories[j].get("SHEEP", 0) - cow_or_sheep_needed[farmer_col[j]]
-                        cow_or_sheep_needed[farmer_col[j]] = 0
-                    else:
-                        cow_or_sheep_needed[farmer_col[j]] -= inventories[j].get("COW", 0) + inventories[j].get("SHEEP", 0)
-                desired_col, r = farmer_col[i]
-                if current_x != desired_col:
-                    g_needed = goose_needed[farmer_col[i]]
-                    goose_needed[farmer_col[i]] = 0
-                    c_s_needed = cow_or_sheep_needed[farmer_col[i]]
-                    cow_or_sheep_needed[farmer_col[i]] = 0
-                    other = animals_needed[farmer_col[i]]
-                    animals_needed[farmer_col[i]] = 0
-                    if shed_contents["GOOSE"] > 0 and g_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                        worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), g_needed + other)])
-                        shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), g_needed + other)
-                    elif shed_contents["COW"] > 0 and c_s_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                        worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)])
-                        shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)
-                    elif shed_contents["SHEEP"] > 0 and c_s_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                        worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)])
-                        shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)
-                    elif other > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                        if shed_contents["GOOSE"] - sum(goose_needed.values()) >= other:
-                            worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)])
-                            shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)
-                        elif shed_contents["COW"] - sum(cow_or_sheep_needed.values()) >= other:
-                            worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)])
-                            shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)
-                        elif shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= other:
-                            worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)])
-                            shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)
-                        elif shed_contents["GOOSE"] - sum(goose_needed.values()) > 0:
-                            worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)])
-                            shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)
-                        elif shed_contents["COW"] - sum(cow_or_sheep_needed.values()) >= 0:
-                            worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)])
-                            shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)
-                        elif shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= 0:
-                            worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)])
-                            shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)
-                        elif shed_contents["COW"] + shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= 0:
-                            if shed_contents["COW"] > shed_contents["SHEEP"]:
-                                    worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"], other)])
-                                    shed_contents["COW"] -= min(shed_contents["COW"], other)
-                            else:
-                                worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"], other)])
-                                shed_contents["SHEEP"] -= min(shed_contents["SHEEP"], other)
+                        if farmer_pos != [4, 4]:
+                            worker_actions.append(step_toward(farmer_pos, (4, 4)))
                         else:
-                            worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                    elif (current_x, current_y) in shed_adjacent_tiles and inventories[i].get("WHEAT", 0) < held_animals + animals_in_col[farmer_col[i]] and shed.get("WHEAT", 0) > 0:
-                        worker_actions.append(["PICKUP", "WHEAT", min(shed.get("WHEAT", 0), held_animals + animals_in_col[farmer_col[i]] - inventories[i].get("WHEAT", 0))])
-                    elif len(fert_needed_in_col[farmer_col[i]]) - inventories[i].get("FERTILIZER", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles and shed.get("FERTILIZER", 0) > 0:
-                        worker_actions.append(["PICKUP", "FERTILIZER", min(shed.get("FERTILIZER", 0), len(fert_needed_in_col[farmer_col[i]]) - inventories[i].get("FERTILIZER", 0))])
-                        print('pick up stix')
-                    else: 
-                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                    '''
-                    if shed.get("GOOSE", 0) > 0 and empty_tiles_in_col[farmer_col[i]] + empty_coops_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                        worker_actions.append(["PICKUP", "GOOSE", min(2, empty_tiles_in_col[farmer_col[i]] + empty_coops_in_col[farmer_col[i]], shed.get("GOOSE", 0))])
-                        held_animals = min(math.ceil(animals_in_shed // 5), empty_tiles_in_col[farmer_col[i]] + empty_coops_in_col[farmer_col[i]], shed.get("GOOSE", 0))
-                    elif shed.get("COW", 0) > 0 and empty_tiles_in_col[farmer_col[i]] + empty_pastures_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                        worker_actions.append(["PICKUP", "COW", min(2, empty_tiles_in_col[farmer_col[i]] + empty_pastures_in_col[farmer_col[i]], shed.get("COW", 0))])
-                        held_animals = min(math.ceil(animals_in_shed // 5), empty_tiles_in_col[farmer_col[i]]  + empty_pastures_in_col[farmer_col[i]], shed.get("COW", 0))
-                    elif shed.get("SHEEP", 0) > 0 and empty_tiles_in_col[farmer_col[i]] + empty_pastures_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
-                        worker_actions.append(["PICKUP", "SHEEP", min(2, empty_tiles_in_col[farmer_col[i]]  + empty_pastures_in_col[farmer_col[i]], shed.get("SHEEP", 0))])
-                        held_animals = min(math.ceil(animals_in_shed // 5), empty_tiles_in_col[farmer_col[i]]  + empty_pastures_in_col[farmer_col[i]], shed.get("SHEEP", 0))
-                        '''
+                            worker_actions.append(["DROP"])
+                    
                 else:
-                    if current_tile == None:
-                        if current_x in {3, 4, 5} and current_y in {3, 4, 5}:
-                            if hour < 23:
-                                if remaining_seeds.get("MELON", 0) > 0:
-                                    worker_actions.append(["PLANT", "MELON"])
-                                    remaining_seeds["MELON"] -= 1
-                                elif "COW" in inventories[i] or "SHEEP" in inventories[i]:
+                    held_animals = inventories[i].get("COW", 0) + inventories[i].get("SHEEP", 0) + inventories[i].get("GOOSE", 0)
+                    if i == 0:
+                        current_x, current_y = farmer_pos
+                    else:
+                        current_x, current_y = hands_list[i - 1]
+                    current_tile = my_tiles[current_y][current_x]
+                    for j in range(len(hands_list) + 1):
+                        if goose_needed[farmer_col[j]] - inventories[j].get("GOOSE", 0) <= 0:
+                            animals_needed[farmer_col[j]] -= inventories[j].get("GOOSE", 0) - goose_needed[farmer_col[j]]
+                            goose_needed[farmer_col[j]] = 0
+                        else:
+                            goose_needed[farmer_col[j]] -= inventories[j].get("GOOSE", 0)
+                        if cow_or_sheep_needed[farmer_col[j]] - inventories[j].get("COW", 0) - inventories[j].get("SHEEP", 0) <= 0:
+                            animals_needed[farmer_col[j]] -= inventories[j].get("COW", 0) + inventories[j].get("SHEEP", 0) - cow_or_sheep_needed[farmer_col[j]]
+                            cow_or_sheep_needed[farmer_col[j]] = 0
+                        else:
+                            cow_or_sheep_needed[farmer_col[j]] -= inventories[j].get("COW", 0) + inventories[j].get("SHEEP", 0)
+                    desired_col, r = farmer_col[i]
+                    if current_x != desired_col:
+                        g_needed = goose_needed[farmer_col[i]]
+                        goose_needed[farmer_col[i]] = 0
+                        c_s_needed = cow_or_sheep_needed[farmer_col[i]]
+                        cow_or_sheep_needed[farmer_col[i]] = 0
+                        other = animals_needed[farmer_col[i]]
+                        animals_needed[farmer_col[i]] = 0
+                        if shed_contents["GOOSE"] > 0 and g_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                            worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), g_needed + other)])
+                            shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), g_needed + other)
+                        elif shed_contents["COW"] > 0 and c_s_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                            worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)])
+                            shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)
+                        elif shed_contents["SHEEP"] > 0 and c_s_needed > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                            worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)])
+                            shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), c_s_needed + other)
+                        elif other > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                            if shed_contents["GOOSE"] - sum(goose_needed.values()) >= other:
+                                worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)])
+                                shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)
+                            elif shed_contents["COW"] - sum(cow_or_sheep_needed.values()) >= other:
+                                worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)])
+                                shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)
+                            elif shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= other:
+                                worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)])
+                                shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)
+                            elif shed_contents["GOOSE"] - sum(goose_needed.values()) > 0:
+                                worker_actions.append(["PICKUP", "GOOSE", min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)])
+                                shed_contents["GOOSE"] -= min(shed_contents["GOOSE"] - sum(goose_needed.values()), other)
+                            elif shed_contents["COW"] - sum(cow_or_sheep_needed.values()) >= 0:
+                                worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)])
+                                shed_contents["COW"] -= min(shed_contents["COW"] - sum(cow_or_sheep_needed.values()), other)
+                            elif shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= 0:
+                                worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)])
+                                shed_contents["SHEEP"] -= min(shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()), other)
+                            elif shed_contents["COW"] + shed_contents["SHEEP"] - sum(cow_or_sheep_needed.values()) >= 0:
+                                if shed_contents["COW"] > shed_contents["SHEEP"]:
+                                        worker_actions.append(["PICKUP", "COW", min(shed_contents["COW"], other)])
+                                        shed_contents["COW"] -= min(shed_contents["COW"], other)
+                                else:
+                                    worker_actions.append(["PICKUP", "SHEEP", min(shed_contents["SHEEP"], other)])
+                                    shed_contents["SHEEP"] -= min(shed_contents["SHEEP"], other)
+                            else:
+                                worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                        elif (current_x, current_y) in shed_adjacent_tiles and inventories[i].get("WHEAT", 0) < held_animals + animals_in_col[farmer_col[i]] and shed.get("WHEAT", 0) > 0:
+                            worker_actions.append(["PICKUP", "WHEAT", min(shed.get("WHEAT", 0), held_animals + animals_in_col[farmer_col[i]] - inventories[i].get("WHEAT", 0))])
+                        elif len(fert_needed_in_col[farmer_col[i]]) - inventories[i].get("FERTILIZER", 0) > 0 and (current_x, current_y) in shed_adjacent_tiles and shed.get("FERTILIZER", 0) > 0:
+                            worker_actions.append(["PICKUP", "FERTILIZER", min(shed.get("FERTILIZER", 0), len(fert_needed_in_col[farmer_col[i]]) - inventories[i].get("FERTILIZER", 0))])
+                            #print('pick up stix')
+                        else: 
+                            worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                        '''
+                        if shed.get("GOOSE", 0) > 0 and empty_tiles_in_col[farmer_col[i]] + empty_coops_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                            worker_actions.append(["PICKUP", "GOOSE", min(2, empty_tiles_in_col[farmer_col[i]] + empty_coops_in_col[farmer_col[i]], shed.get("GOOSE", 0))])
+                            held_animals = min(math.ceil(animals_in_shed // 5), empty_tiles_in_col[farmer_col[i]] + empty_coops_in_col[farmer_col[i]], shed.get("GOOSE", 0))
+                        elif shed.get("COW", 0) > 0 and empty_tiles_in_col[farmer_col[i]] + empty_pastures_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                            worker_actions.append(["PICKUP", "COW", min(2, empty_tiles_in_col[farmer_col[i]] + empty_pastures_in_col[farmer_col[i]], shed.get("COW", 0))])
+                            held_animals = min(math.ceil(animals_in_shed // 5), empty_tiles_in_col[farmer_col[i]]  + empty_pastures_in_col[farmer_col[i]], shed.get("COW", 0))
+                        elif shed.get("SHEEP", 0) > 0 and empty_tiles_in_col[farmer_col[i]] + empty_pastures_in_col[farmer_col[i]] > 0 and (current_x, current_y) in shed_adjacent_tiles:
+                            worker_actions.append(["PICKUP", "SHEEP", min(2, empty_tiles_in_col[farmer_col[i]]  + empty_pastures_in_col[farmer_col[i]], shed.get("SHEEP", 0))])
+                            held_animals = min(math.ceil(animals_in_shed // 5), empty_tiles_in_col[farmer_col[i]]  + empty_pastures_in_col[farmer_col[i]], shed.get("SHEEP", 0))
+                            '''
+                    else:
+                        if current_tile == None:
+                            if (current_x in {2, 3, 4} and current_y == 4) or (current_x in {3, 4} and current_y == 3) or (current_x == 4 and current_y == 2):
+                                if hour < 23:
+                                    if remaining_seeds.get("MELON", 0) > 0:
+                                        worker_actions.append(["PLANT", "MELON"])
+                                        remaining_seeds["MELON"] -= 1
+                                    elif "COW" in inventories[i] or "SHEEP" in inventories[i]:
+                                        worker_actions.append(["BUILD_PASTURE"])
+                                    elif "GOOSE" in inventories[i]:
+                                        worker_actions.append(["BUILD_COOP"])
+                                    elif remaining_seeds.get("WHEAT", 0) > 0:
+                                        worker_actions.append(["PLANT", "WHEAT"])
+                                        remaining_seeds["WHEAT"] -= 1
+                                    elif remaining_seeds.get("CARROT", 0) > 0:
+                                        worker_actions.append(["PLANT", "CARROT"])
+                                        remaining_seeds["CARROT"] -= 1
+                                    elif remaining_seeds.get("TOMATO", 0) > 0:
+                                        worker_actions.append(["PLANT", "TOMATO"])
+                                        remaining_seeds["TOMATO"] -= 1
+                                    elif remaining_seeds.get("STRAWBERRY", 0) > 0:
+                                        worker_actions.append(["PLANT", "STRAWBERRY"])
+                                        remaining_seeds["STRAWBERRY"] -= 1
+                                    else:
+                                        if current_y != r:
+                                            worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                        else:
+                                            worker_actions.append(["PASS"])
+                                else:
+                                    worker_actions.append(["PASS"])
+                            else:
+                                if "COW" in inventories[i] or "SHEEP" in inventories[i]:
                                     worker_actions.append(["BUILD_PASTURE"])
                                 elif "GOOSE" in inventories[i]:
                                     worker_actions.append(["BUILD_COOP"])
@@ -1332,221 +1409,197 @@ def agent(obs):
                                 elif remaining_seeds.get("STRAWBERRY", 0) > 0:
                                     worker_actions.append(["PLANT", "STRAWBERRY"])
                                     remaining_seeds["STRAWBERRY"] -= 1
+                                elif remaining_seeds.get("MELON", 0) > 0:
+                                    worker_actions.append(["PLANT", "MELON"])
+                                    remaining_seeds["MELON"] -= 1
                                 else:
                                     if current_y != r:
                                         worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
                                     else:
                                         worker_actions.append(["PASS"])
+                        elif current_tile == "LOCKED":
+                            if current_y != r:
+                                worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
                             else:
                                 worker_actions.append(["PASS"])
-                        else:
-                            if "COW" in inventories[i] or "SHEEP" in inventories[i]:
-                                worker_actions.append(["BUILD_PASTURE"])
-                            elif "GOOSE" in inventories[i]:
-                                worker_actions.append(["BUILD_COOP"])
-                            elif remaining_seeds.get("WHEAT", 0) > 0:
-                                worker_actions.append(["PLANT", "WHEAT"])
-                                remaining_seeds["WHEAT"] -= 1
-                            elif remaining_seeds.get("CARROT", 0) > 0:
-                                worker_actions.append(["PLANT", "CARROT"])
-                                remaining_seeds["CARROT"] -= 1
-                            elif remaining_seeds.get("TOMATO", 0) > 0:
-                                worker_actions.append(["PLANT", "TOMATO"])
-                                remaining_seeds["TOMATO"] -= 1
-                            elif remaining_seeds.get("STRAWBERRY", 0) > 0:
-                                worker_actions.append(["PLANT", "STRAWBERRY"])
-                                remaining_seeds["STRAWBERRY"] -= 1
-                            elif remaining_seeds.get("MELON", 0) > 0:
-                                worker_actions.append(["PLANT", "MELON"])
-                                remaining_seeds["MELON"] -= 1
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                        elif current_tile.get("kind") == "PLANT":
+                            age = day - current_tile.get("planted_day")
+                            lifespan = product_lifespan[current_tile.get("crop")]
+                            first_yield_day = time_to_first_yield[current_tile.get("crop")]
+                            bonus_day_start = math.ceil(lifespan / 2)
+                            max_harvest_size = max_harvest[current_tile.get("crop")]
+                            crop_price = prices[current_tile.get("crop")]
+                            if current_tile.get("consecutive_unwatered") > 0 and not current_tile.get("watered_today"):
+                                worker_actions.append(["WATER"])
+                            elif current_tile.get("crop") == "WHEAT":
+                                if age >= bonus_day_start: #bonus window of wheat
+                                    if (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
+                                        worker_actions.append(["HARVEST"])
+                                    elif not current_tile.get("watered_today"):
+                                        worker_actions.append(["WATER"])
+                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < 2 * crop_price:
+                                        worker_actions.append(["FERTILIZE"])
+                                        #print('wheat fertilize')
+                                    elif age >= lifespan or (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
+                                        worker_actions.append(["HARVEST"])
+                                    else:
+                                        if current_y != r:
+                                            worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                        else:
+                                            worker_actions.append(["PASS"])
                                 else:
-                                    worker_actions.append(["PASS"])
-                    elif current_tile == "LOCKED":
-                        if current_y != r:
-                            worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                        else:
-                            worker_actions.append(["PASS"])
-                    elif current_tile.get("kind") == "PLANT":
-                        age = day - current_tile.get("planted_day")
-                        lifespan = product_lifespan[current_tile.get("crop")]
-                        first_yield_day = time_to_first_yield[current_tile.get("crop")]
-                        bonus_day_start = math.ceil(lifespan / 2)
-                        max_harvest_size = max_harvest[current_tile.get("crop")]
-                        crop_price = prices[current_tile.get("crop")]
-                        if current_tile.get("consecutive_unwatered") > 0 and not current_tile.get("watered_today"):
-                            worker_actions.append(["WATER"])
-                        elif current_tile.get("crop") == "WHEAT":
-                            if age >= bonus_day_start: #bonus window of wheat
-                                if (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
-                                    worker_actions.append(["HARVEST"])
-                                elif not current_tile.get("watered_today"):
-                                    worker_actions.append(["WATER"])
-                                elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < 2 * crop_price:
-                                    worker_actions.append(["FERTILIZE"])
-                                    #print('wheat fertilize')
-                                elif age >= lifespan or (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
-                                    worker_actions.append(["HARVEST"])
+                                    if current_y != r:
+                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            elif current_tile.get("crop") == "CARROT":
+                                if age >= bonus_day_start: #bonus window of carrot
+                                    if (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
+                                        worker_actions.append(["HARVEST"])
+                                    elif not current_tile.get("watered_today"):
+                                        worker_actions.append(["WATER"])
+                                    elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
+                                        worker_actions.append(["FERTILIZE"]) 
+                                        #print('carrot fertilize')
+                                    elif age >= lifespan or (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
+                                        worker_actions.append(["HARVEST"])
+                                    else:
+                                        if current_y != r:
+                                            worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                        else:
+                                            worker_actions.append(["PASS"])
+                                else:
+                                    if current_y != r:
+                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            elif current_tile.get("crop") == "MELON":
+                                if age >= bonus_day_start: #bonus window of melon
+                                    if (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day) and (day != 10 or (current_x, current_y) not in [(2, 4), (3, 4), (4, 4), (3, 3), (4, 3), (4, 2)]):
+                                        worker_actions.append(["HARVEST"])
+                                    elif not current_tile.get("watered_today"):
+                                        worker_actions.append(["WATER"])
+                                    #elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
+                                        #worker_actions.append(["FERTILIZE"])
+                                    elif (age >= lifespan or (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day)) and (day != 10 or (current_x, current_y) not in [(2, 4), (3, 4), (4, 4), (3, 3), (4, 3), (4, 2)]):
+                                        worker_actions.append(["HARVEST"])
+                                    else:
+                                        if current_y != r:
+                                            worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                        else:
+                                            worker_actions.append(["PASS"])
+                                else:
+                                    if current_y != r:
+                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            elif current_tile.get("crop") == "TOMATO":
+                                if age in {7, 8, 9, 10, 11}: #bonus window of tomato
+                                    if (age >= lifespan and current_tile.get("yield_units") > 0) or (current_tile.get("yield_units") >= max_harvest_size - 1 and age >= first_yield_day):
+                                        worker_actions.append(["HARVEST"])
+                                    elif not current_tile.get("watered_today") and age < 11:
+                                        worker_actions.append(["WATER"])
+                                    elif (age == 7 or age == 8) and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price * 3:
+                                        worker_actions.append(["FERTILIZE"]) 
+                                        #print('tomato fertilize')
+                                    elif age >= lifespan:
+                                        worker_actions.append(["DIG"])
+                                    else:
+                                        if current_y != r:
+                                            worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                        else:
+                                            worker_actions.append(["PASS"])
+                                else:
+                                    if current_y != r:
+                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            elif current_tile.get("crop") == "STRAWBERRY":
+                                if age in {9, 10, 11, 12, 13, 14, 15, 16}: #bonus window of strawberry
+                                    if (age >= lifespan and current_tile.get("yield_units") > 0) or (current_tile.get("yield_units") >= max_harvest_size - 1 and age >= first_yield_day):
+                                        worker_actions.append(["HARVEST"])
+                                    elif not current_tile.get("watered_today") and age < lifespan:
+                                        worker_actions.append(["WATER"])
+                                    elif age >= 9 and (current_tile.get("fertilized_until_day") == -1  or current_tile.get("fertilized_until_day") < day) and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < 2 * crop_price:
+                                        worker_actions.append(["FERTILIZE"]) 
+                                        #print('strawberry fertilize')
+                                    elif age >= lifespan:
+                                        worker_actions.append(["DIG"])
+                                    else:
+                                        if current_y != r:
+                                            worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                        else:
+                                            worker_actions.append(["PASS"])
                                 else:
                                     if current_y != r:
                                         worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
                                     else:
                                         worker_actions.append(["PASS"])
                             else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                                else:
-                                    worker_actions.append(["PASS"])
-                        elif current_tile.get("crop") == "CARROT":
-                            if age >= bonus_day_start: #bonus window of carrot
-                                if (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
-                                    worker_actions.append(["HARVEST"])
-                                elif not current_tile.get("watered_today"):
-                                    worker_actions.append(["WATER"])
-                                elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
-                                    worker_actions.append(["FERTILIZE"]) 
-                                    #print('carrot fertilize')
-                                elif age >= lifespan or (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
-                                    worker_actions.append(["HARVEST"])
-                                else:
-                                    if current_y != r:
-                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                                else:
-                                    worker_actions.append(["PASS"])
-                        elif current_tile.get("crop") == "MELON":
-                            if age >= bonus_day_start: #bonus window of melon
-                                if (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
-                                    worker_actions.append(["HARVEST"])
-                                elif not current_tile.get("watered_today"):
-                                    worker_actions.append(["WATER"])
-                                #elif age == bonus_day_start and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price:
-                                    #worker_actions.append(["FERTILIZE"])
-                                elif age >= lifespan or (current_tile.get("yield_units") >= max_harvest_size and age >= first_yield_day):
-                                    worker_actions.append(["HARVEST"])
-                                else:
-                                    if current_y != r:
-                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                                else:
-                                    worker_actions.append(["PASS"])
-                        elif current_tile.get("crop") == "TOMATO":
-                            if age in {7, 8, 9, 10, 11}: #bonus window of tomato
-                                if (age >= lifespan and current_tile.get("yield_units") > 0) or (current_tile.get("yield_units") >= max_harvest_size - 1 and age >= first_yield_day):
-                                    worker_actions.append(["HARVEST"])
-                                elif not current_tile.get("watered_today") and age < 11:
-                                    worker_actions.append(["WATER"])
-                                elif (age == 7 or age == 8) and current_tile.get("fertilized_until_day") == -1 and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < crop_price * 3:
-                                    worker_actions.append(["FERTILIZE"]) 
-                                    #print('tomato fertilize')
-                                elif age >= lifespan:
-                                    worker_actions.append(["DIG"])
-                                else:
-                                    if current_y != r:
-                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                                else:
-                                    worker_actions.append(["PASS"])
-                        elif current_tile.get("crop") == "STRAWBERRY":
-                            if age in {9, 10, 11, 12, 13, 14, 15, 16}: #bonus window of strawberry
-                                if (age >= lifespan and current_tile.get("yield_units") > 0) or (current_tile.get("yield_units") >= max_harvest_size - 1 and age >= first_yield_day):
-                                    worker_actions.append(["HARVEST"])
-                                elif not current_tile.get("watered_today") and age < lifespan:
-                                    worker_actions.append(["WATER"])
-                                elif age >= 9 and (current_tile.get("fertilized_until_day") == -1  or current_tile.get("fertilized_until_day") < day) and inventories[i].get("FERTILIZER", 0) > 0 and prices["FERTILIZER"] < 2 * crop_price:
-                                    worker_actions.append(["FERTILIZE"]) 
-                                    #print('strawberry fertilize')
-                                elif age >= lifespan:
-                                    worker_actions.append(["DIG"])
-                                else:
-                                    if current_y != r:
-                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                                    else:
-                                        worker_actions.append(["PASS"])
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
-                                else:
-                                    worker_actions.append(["PASS"])
-                        else:
-                            print('unknown plant detected')
-                    elif current_tile.get("kind") == "COOP" or current_tile.get("kind") == "PASTURE":
-                        age = day - current_tile.get("placed_day", 0)
+                                print('unknown plant detected')
+                        elif current_tile.get("kind") == "COOP" or current_tile.get("kind") == "PASTURE":
+                            age = day - current_tile.get("placed_day", 0)
 
-                        if current_tile.get("animal") == None and current_tile.get("kind") == "PASTURE":
-                            if inventories[i].get("COW", 0) > 0:
-                                worker_actions.append(["PLACE", "COW"])
-                            elif inventories[i].get("SHEEP", 0) > 0:
-                                worker_actions.append(["PLACE", "SHEEP"])
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                            if current_tile.get("animal") == None and current_tile.get("kind") == "PASTURE":
+                                if inventories[i].get("COW", 0) > 0:
+                                    worker_actions.append(["PLACE", "COW"])
+                                elif inventories[i].get("SHEEP", 0) > 0:
+                                    worker_actions.append(["PLACE", "SHEEP"])
                                 else:
-                                    worker_actions.append(["PASS"])
-                        elif current_tile.get("animal") == None and current_tile.get("kind") == "COOP":
-                            if inventories[i].get("GOOSE", 0) > 0:
-                                worker_actions.append(["PLACE", "GOOSE"])
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    if current_y != r:
+                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            elif current_tile.get("animal") == None and current_tile.get("kind") == "COOP":
+                                if inventories[i].get("GOOSE", 0) > 0:
+                                    worker_actions.append(["PLACE", "GOOSE"])
                                 else:
-                                    worker_actions.append(["PASS"])
-                        elif (current_tile.get("consecutive_unfed") == 1 or current_tile.get("cared_today") or age == time_to_first_yield[current_tile.get("animal")] - 1) and not current_tile.get("fed_today") and inventories[i].get("WHEAT", 0) > 0:
-                            worker_actions.append(["FEED"])
-                        elif current_tile.get("fertilizer_available"):
-                            worker_actions.append(["COLLECT_FERTILIZER"])
-                        elif current_tile.get("animal") == "GOOSE":
-                            if current_tile.get("yield_units") >= 4:
-                                worker_actions.append(["HARVEST"])
-                            elif (current_tile.get("pending_care_bonus") < 3 or current_tile.get("fed_today")) and not current_tile.get("cared_today"):
-                                worker_actions.append(["CARE"])
-                            elif current_tile.get("yield_units") > 0:
-                                worker_actions.append(["HARVEST"])
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    if current_y != r:
+                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            elif (current_tile.get("consecutive_unfed") == 1 or current_tile.get("cared_today") or age == time_to_first_yield[current_tile.get("animal")] - 1) and not current_tile.get("fed_today") and inventories[i].get("WHEAT", 0) > 0:
+                                worker_actions.append(["FEED"])
+                            elif current_tile.get("fertilizer_available"):
+                                worker_actions.append(["COLLECT_FERTILIZER"])
+                            elif current_tile.get("animal") == "GOOSE":
+                                if current_tile.get("yield_units") >= 4:
+                                    worker_actions.append(["HARVEST"])
+                                elif (current_tile.get("pending_care_bonus") < 3 or current_tile.get("fed_today")) and not current_tile.get("cared_today"):
+                                    worker_actions.append(["CARE"])
+                                elif current_tile.get("yield_units") > 0:
+                                    worker_actions.append(["HARVEST"])
                                 else:
-                                    worker_actions.append(["PASS"])
-                        elif current_tile.get("animal") == "COW":
-                            if current_tile.get("yield_units") >= 6:
-                                worker_actions.append(["HARVEST"])
-                            elif (current_tile.get("pending_care_bonus") < 5 or current_tile.get("fed_today")) and not current_tile.get("cared_today"):
-                                worker_actions.append(["CARE"])
-                            elif current_tile.get("yield_units") > 0:
-                                worker_actions.append(["HARVEST"])
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    if current_y != r:
+                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            elif current_tile.get("animal") == "COW":
+                                if current_tile.get("yield_units") >= 6:
+                                    worker_actions.append(["HARVEST"])
+                                elif (current_tile.get("pending_care_bonus") < 5 or current_tile.get("fed_today")) and not current_tile.get("cared_today"):
+                                    worker_actions.append(["CARE"])
+                                elif current_tile.get("yield_units") > 0:
+                                    worker_actions.append(["HARVEST"])
                                 else:
-                                    worker_actions.append(["PASS"])
-                        elif current_tile.get("animal") == "SHEEP":
-                            if current_tile.get("yield_units") >= 6:
-                                worker_actions.append(["HARVEST"])
-                            elif (current_tile.get("pending_care_bonus") < 5 or current_tile.get("fed_today")) and not current_tile.get("cared_today"):
-                                worker_actions.append(["CARE"])
-                            elif current_tile.get("yield_units") > 0:
-                                worker_actions.append(["HARVEST"])
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    if current_y != r:
+                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            elif current_tile.get("animal") == "SHEEP":
+                                if current_tile.get("yield_units") >= 6:
+                                    worker_actions.append(["HARVEST"])
+                                elif (current_tile.get("pending_care_bonus") < 5 or current_tile.get("fed_today")) and not current_tile.get("cared_today"):
+                                    worker_actions.append(["CARE"])
+                                elif current_tile.get("yield_units") > 0:
+                                    worker_actions.append(["HARVEST"])
                                 else:
-                                    worker_actions.append(["PASS"])
-                    elif current_tile.get("kind") == "WEED":
-                        worker_actions.append(["DIG"])
+                                    if current_y != r:
+                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    else:
+                                        worker_actions.append(["PASS"])
+                        elif current_tile.get("kind") == "WEED":
+                            worker_actions.append(["DIG"])
             
 
 

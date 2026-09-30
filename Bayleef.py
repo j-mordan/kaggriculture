@@ -1097,6 +1097,8 @@ def agent(obs):
                     worker_actions.append(step_toward(current_pos, (0, 0)))
                 elif i == 1 and hour < 8:
                     worker_actions.append(step_toward(current_pos, (9, 0)))
+                elif i == 2 and hour < 8 and quads_allowed == 3:
+                    worker_actions.append(step_toward(current_pos, (0, 9)))
                 else:
                     # Check if this worker can claim a crop
                     chosen_crop = None
@@ -1322,31 +1324,34 @@ def agent(obs):
                         '''
                 else:
                     if current_tile == None:
-                        if current_x + current_y >= 6:
-                            if remaining_seeds.get("MELON", 0) > 0:
-                                worker_actions.append(["PLANT", "MELON"])
-                                remaining_seeds["MELON"] -= 1
-                            elif "COW" in inventories[i] or "SHEEP" in inventories[i]:
-                                worker_actions.append(["BUILD_PASTURE"])
-                            elif "GOOSE" in inventories[i]:
-                                worker_actions.append(["BUILD_COOP"])
-                            elif remaining_seeds.get("WHEAT", 0) > 0:
-                                worker_actions.append(["PLANT", "WHEAT"])
-                                remaining_seeds["WHEAT"] -= 1
-                            elif remaining_seeds.get("CARROT", 0) > 0:
-                                worker_actions.append(["PLANT", "CARROT"])
-                                remaining_seeds["CARROT"] -= 1
-                            elif remaining_seeds.get("TOMATO", 0) > 0:
-                                worker_actions.append(["PLANT", "TOMATO"])
-                                remaining_seeds["TOMATO"] -= 1
-                            elif remaining_seeds.get("STRAWBERRY", 0) > 0:
-                                worker_actions.append(["PLANT", "STRAWBERRY"])
-                                remaining_seeds["STRAWBERRY"] -= 1
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                        if current_x in {3, 4, 5} and current_y in {3, 4, 5}:
+                            if hour < 23:
+                                if remaining_seeds.get("MELON", 0) > 0:
+                                    worker_actions.append(["PLANT", "MELON"])
+                                    remaining_seeds["MELON"] -= 1
+                                elif "COW" in inventories[i] or "SHEEP" in inventories[i]:
+                                    worker_actions.append(["BUILD_PASTURE"])
+                                elif "GOOSE" in inventories[i]:
+                                    worker_actions.append(["BUILD_COOP"])
+                                elif remaining_seeds.get("WHEAT", 0) > 0:
+                                    worker_actions.append(["PLANT", "WHEAT"])
+                                    remaining_seeds["WHEAT"] -= 1
+                                elif remaining_seeds.get("CARROT", 0) > 0:
+                                    worker_actions.append(["PLANT", "CARROT"])
+                                    remaining_seeds["CARROT"] -= 1
+                                elif remaining_seeds.get("TOMATO", 0) > 0:
+                                    worker_actions.append(["PLANT", "TOMATO"])
+                                    remaining_seeds["TOMATO"] -= 1
+                                elif remaining_seeds.get("STRAWBERRY", 0) > 0:
+                                    worker_actions.append(["PLANT", "STRAWBERRY"])
+                                    remaining_seeds["STRAWBERRY"] -= 1
                                 else:
-                                    worker_actions.append(["PASS"])
+                                    if current_y != r:
+                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            else:
+                                worker_actions.append(["PASS"])
                         else:
                             if "COW" in inventories[i] or "SHEEP" in inventories[i]:
                                 worker_actions.append(["BUILD_PASTURE"])

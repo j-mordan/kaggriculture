@@ -1019,6 +1019,8 @@ def agent(obs):
         sheep_wanted = 0
         wheat_wanted = 0
         total_seeds_and_animals = seeds.get("WHEAT", 0) + seeds.get("CARROT", 0) + seeds.get("MELON", 0) + seeds.get("TOMATO", 0) + seeds.get("STRAWBERRY", 0) + shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0)
+        empty_tiles -= total_seeds_and_animals
+        empty_tiles = max(0, empty_tiles)
         start_money = max(0, my_farm["money"] - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 2 - prices["WHEAT"] * (animals_my_farm + held_animals_rn + animals_in_shed_rn) * (2 if day == 0 else 1))
         unlocked_quads = len(my_farm["unlocked_quadrants"])
         affordable = True
@@ -1114,6 +1116,8 @@ def agent(obs):
                     worker_actions.append(step_toward(current_pos, (0, 0)))
                 elif i == 1 and hour < 8:
                     worker_actions.append(step_toward(current_pos, (9, 0)))
+                elif i == 2 and hour < 8 and quads_allowed == 3:
+                    worker_actions.append(step_toward(current_pos, (0, 9)))
                 else:
                     # Check if this worker can claim a crop
                     chosen_crop = None
@@ -1163,6 +1167,8 @@ def agent(obs):
             tomato_seed_wanted = 0
             strawberry_seed_wanted = 0
             total_seeds_and_animals = seeds.get("WHEAT", 0) + seeds.get("CARROT", 0) + seeds.get("MELON", 0) + seeds.get("TOMATO", 0) + seeds.get("STRAWBERRY", 0) + shed.get("GOOSE", 0) + shed.get("COW", 0) + shed.get("SHEEP", 0) + sum(inventories[k].get("COW", 0) + inventories[k].get("SHEEP", 0) + inventories[k].get("GOOSE", 0) for k in range(len(hands_list) + 1)) 
+            empty_tiles -= total_seeds_and_animals
+            empty_tiles = max(0, empty_tiles)
             start_money = max(0, my_farm["money"] - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 2 - prices["WHEAT"] * (animals_my_farm + held_animals_rn + animals_in_shed_rn) * (2 if day == 0 else 0))
             unlocked_quads = len(my_farm["unlocked_quadrants"])
             affordable = True
@@ -1305,31 +1311,34 @@ def agent(obs):
                         '''
                 else:
                     if current_tile == None:
-                        if current_x + current_y >= 6:
-                            if remaining_seeds.get("MELON", 0) > 0:
-                                worker_actions.append(["PLANT", "MELON"])
-                                remaining_seeds["MELON"] -= 1
-                            elif "COW" in inventories[i] or "SHEEP" in inventories[i]:
-                                worker_actions.append(["BUILD_PASTURE"])
-                            elif "GOOSE" in inventories[i]:
-                                worker_actions.append(["BUILD_COOP"])
-                            elif remaining_seeds.get("WHEAT", 0) > 0:
-                                worker_actions.append(["PLANT", "WHEAT"])
-                                remaining_seeds["WHEAT"] -= 1
-                            elif remaining_seeds.get("CARROT", 0) > 0:
-                                worker_actions.append(["PLANT", "CARROT"])
-                                remaining_seeds["CARROT"] -= 1
-                            elif remaining_seeds.get("TOMATO", 0) > 0:
-                                worker_actions.append(["PLANT", "TOMATO"])
-                                remaining_seeds["TOMATO"] -= 1
-                            elif remaining_seeds.get("STRAWBERRY", 0) > 0:
-                                worker_actions.append(["PLANT", "STRAWBERRY"])
-                                remaining_seeds["STRAWBERRY"] -= 1
-                            else:
-                                if current_y != r:
-                                    worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                        if current_x in {3, 4, 5} and current_y in {3, 4, 5}:
+                            if hour < 23:
+                                if remaining_seeds.get("MELON", 0) > 0:
+                                    worker_actions.append(["PLANT", "MELON"])
+                                    remaining_seeds["MELON"] -= 1
+                                elif "COW" in inventories[i] or "SHEEP" in inventories[i]:
+                                    worker_actions.append(["BUILD_PASTURE"])
+                                elif "GOOSE" in inventories[i]:
+                                    worker_actions.append(["BUILD_COOP"])
+                                elif remaining_seeds.get("WHEAT", 0) > 0:
+                                    worker_actions.append(["PLANT", "WHEAT"])
+                                    remaining_seeds["WHEAT"] -= 1
+                                elif remaining_seeds.get("CARROT", 0) > 0:
+                                    worker_actions.append(["PLANT", "CARROT"])
+                                    remaining_seeds["CARROT"] -= 1
+                                elif remaining_seeds.get("TOMATO", 0) > 0:
+                                    worker_actions.append(["PLANT", "TOMATO"])
+                                    remaining_seeds["TOMATO"] -= 1
+                                elif remaining_seeds.get("STRAWBERRY", 0) > 0:
+                                    worker_actions.append(["PLANT", "STRAWBERRY"])
+                                    remaining_seeds["STRAWBERRY"] -= 1
                                 else:
-                                    worker_actions.append(["PASS"])
+                                    if current_y != r:
+                                        worker_actions.append(step_toward((current_x, current_y), farmer_col[i]))
+                                    else:
+                                        worker_actions.append(["PASS"])
+                            else:
+                                worker_actions.append(["PASS"])
                         else:
                             if "COW" in inventories[i] or "SHEEP" in inventories[i]:
                                 worker_actions.append(["BUILD_PASTURE"])

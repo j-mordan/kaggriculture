@@ -1,5 +1,6 @@
 import math
 from collections import defaultdict
+import numpy as np
 
 def step_toward(pos, target):
     """Return a single movement action (NORTH/SOUTH/EAST/WEST) that reduces
@@ -61,6 +62,71 @@ def predict_price(
         raw_price = base - amp * f_val
 
     return max(1, round(raw_price))
+
+def build_chunks(products, seed_cost, prices, projected_harvest, projected_inventory,
+                  base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
+                  product_lifespan, product_cost_per_day, budget, max_units):
+    """One chunk per potential purchase: (product, cost, marginal_daily_profit).
+    Values are strictly non-increasing per product because buying more pushes
+    its price down via predict_price, mirroring what update_value already does."""
+    chunks = []
+    for p in products:
+        inv = projected_inventory[p]
+        extra = prices["WHEAT"] if p in ("EGG", "MILK", "WOOL") else 0
+        cost = seed_cost[p] + extra
+        if cost > budget or product_lifespan[p] <= 0:
+            continue
+        for _unit in range(max_units):
+            inv += projected_harvest[p]
+            price = predict_price(inv, base_costs[p], T_values[p], below_funcs[p],
+                                   below_targets[p], above_funcs[p], above_targets[p])
+            rev = price * projected_harvest[p] / product_lifespan[p]
+            value = rev - product_cost_per_day[p]
+            if value <= 0:
+                break
+            chunks.append((p, cost, value))
+    return chunks
+
+def solve_allocation_np(chunks, budget, tiles):
+    """
+    chunks: list of (product, cost, value) tuples, one per potential unit purchase,
+            with value non-increasing per product (from build_chunks()).
+    budget, tiles: integers.
+    Returns (bought: dict[product]->count, total_daily_profit: float)
+    """
+    budget = int(budget)
+    if budget < 0:
+        budget = 0
+
+    NEG = -1e18
+    dp = np.full((tiles + 1, budget + 1), NEG, dtype=np.float64)
+    dp[0, 0] = 0.0
+    # One (tiles x budget) array total -- NOT one per chunk, so memory stays small
+    picked = np.full((tiles + 1, budget + 1), -1, dtype=np.int32)
+
+    for idx, (p, cost, value) in enumerate(chunks):
+        cost = int(round(cost))
+        if cost > budget or cost <= 0:
+            continue
+        for t in range(tiles, 0, -1):
+            prev_row = dp[t - 1, :budget - cost + 1]     # states reachable before this chunk
+            cur_slice = dp[t, cost:budget + 1]            # states after adding this chunk
+            candidate = prev_row + value
+            mask = candidate > cur_slice
+            dp[t, cost:budget + 1] = np.where(mask, candidate, cur_slice)
+            picked[t, cost:budget + 1] = np.where(mask, idx, picked[t, cost:budget + 1])
+
+    best_t, best_b = np.unravel_index(np.argmax(dp), dp.shape)
+    best_v = dp[best_t, best_b]
+
+    bought = defaultdict(int)
+    t, b = int(best_t), int(best_b)
+    while picked[t, b] != -1:
+        idx = int(picked[t, b])
+        p, cost, value = chunks[idx]
+        bought[p] += 1
+        t, b = t - 1, b - int(round(cost))
+    return bought, float(best_v)
 
 def agent(obs):
     """
@@ -956,72 +1022,23 @@ def agent(obs):
         start_money = max(0, my_farm["money"] - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 2 - prices["WHEAT"] * (animals_my_farm + held_animals_rn + animals_in_shed_rn) * (2 if day == 0 else 1))
         unlocked_quads = len(my_farm["unlocked_quadrants"])
         affordable = True
-        while affordable: #change so if a purchase goes lower than 0 it doesn't go through
-            sorted_products = sorted(
-            product_values.keys(), 
-            key=lambda p: product_values[p], 
-            reverse=True
-            )
-            current_max_value_product = next(
-            (p for p in sorted_products if seed_cost[p] <= start_money), 
-            None  # fallback if nothing is affordable, add to this for plants about to be harvested
-            )
-            if total_seeds_and_animals >= empty_tiles:
-                if unlocked_quads < quads_allowed and start_money > new_quadrant_costs[unlocked_quads + 1]:
-                    #print(total_seeds_and_animals)
-                    #print(empty_tiles)
-                    start_money -= new_quadrant_costs[len(my_farm["unlocked_quadrants"]) + 1]
-                    market_orders.append(["BUY_LAND"])
-                    empty_tiles += 25
-                    unlocked_quads += 1
-                else:
-                    break
-            if current_max_value_product == None:
-                affordable = False
-            elif product_values[current_max_value_product] < 0:
-                affordable = False
-            elif current_max_value_product == "WHEAT":
-                wheat_seed_wanted += 1
-                start_money -= seed_cost["WHEAT"]
-                update_value("WHEAT")
-            elif current_max_value_product == "CARROT":
-                carrot_seed_wanted += 1
-                start_money -= seed_cost["CARROT"]
-                update_value("CARROT")
-            elif current_max_value_product == "MELON":
-                melon_seed_wanted += 1
-                start_money -= seed_cost["MELON"]
-                update_value("MELON")
-            elif current_max_value_product == "TOMATO":
-                tomato_seed_wanted += 1
-                start_money -= seed_cost["TOMATO"]
-                update_value("TOMATO")
-            elif current_max_value_product == "STRAWBERRY":
-                strawberry_seed_wanted += 1
-                start_money -= seed_cost["STRAWBERRY"]
-                update_value("STRAWBERRY")
-            elif current_max_value_product == "EGG":
-                goose_wanted += 1
-                start_money -= seed_cost["EGG"]
-                if hour == 0:
-                    start_money -= prices["WHEAT"]
-                update_value("EGG")
-            elif current_max_value_product == "MILK":
-                cow_wanted += 1
-                start_money -= seed_cost["MILK"]
-                if hour == 0:
-                    start_money -= prices["WHEAT"]
-                update_value("MILK")
-            elif current_max_value_product == "WOOL":
-                sheep_wanted += 1
-                start_money -= seed_cost["WOOL"]
-                if hour == 0:
-                    start_money -= prices["WHEAT"]
-                update_value("WOOL")
-            else:
-                print('something went wrong with current_max_value_product:', current_max_value_product)
-                break
-            total_seeds_and_animals += 1
+        budget = max(0, int(start_money))
+        chunks = build_chunks(
+            list(product_values.keys()), seed_cost, prices, projected_harvest, projected_inventory,
+            base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
+            product_lifespan, product_cost_per_day, budget, max_units=empty_tiles
+        )
+        bought, total_daily_profit = solve_allocation_np(chunks, budget, empty_tiles)
+
+        wheat_seed_wanted = bought.get("WHEAT", 0) - seeds.get("WHEAT", 0)
+        carrot_seed_wanted = bought.get("CARROT", 0) - seeds.get("CARROT", 0)
+        melon_seed_wanted = bought.get("MELON", 0) - seeds.get("MELON", 0)
+        tomato_seed_wanted = bought.get("TOMATO", 0) - seeds.get("TOMATO", 0)
+        strawberry_seed_wanted = bought.get("STRAWBERRY", 0) - seeds.get("STRAWBERRY", 0)
+        goose_wanted = bought.get("EGG", 0) - shed.get("GOOSE", 0)
+        cow_wanted = bought.get("MILK", 0) - shed.get("COW", 0)
+        sheep_wanted = bought.get("WOOL", 0) - shed.get("SHEEP", 0)
+
         if goose_wanted > 0:
             market_orders.append(["BUY_ANIMAL", "GOOSE", goose_wanted])
         if cow_wanted > 0:
@@ -1149,57 +1166,23 @@ def agent(obs):
             start_money = max(0, my_farm["money"] - cost_of_n_farmers[5 * len(my_farm["unlocked_quadrants"])] * 2 - prices["WHEAT"] * (animals_my_farm + held_animals_rn + animals_in_shed_rn) * (2 if day == 0 else 0))
             unlocked_quads = len(my_farm["unlocked_quadrants"])
             affordable = True
-            while affordable: #change so if a purchase goes lower than 0 it doesn't go through
-                sorted_products = sorted(
-                product_values.keys(), 
-                key=lambda p: product_values[p], 
-                reverse=True
-                )
-                for animal in ("EGG", "MILK", "WOOL"):
-                    if animal in sorted_products:
-                        sorted_products.remove(animal)
-                current_max_value_product = next(
-                (p for p in sorted_products if seed_cost[p] <= start_money), 
-                None  # fallback if nothing is affordable, add to this for plants about to be harvested
-                )
-                if total_seeds_and_animals >= empty_tiles:
-                    if unlocked_quads < quads_allowed and start_money > new_quadrant_costs[unlocked_quads + 1]:
-                        #print(total_seeds_and_animals)
-                        #print(empty_tiles)
-                        start_money -= new_quadrant_costs[len(my_farm["unlocked_quadrants"]) + 1]
-                        market_orders.append(["BUY_LAND"])
-                        empty_tiles += 25
-                        unlocked_quads += 1
-                    else:
-                        break
-                if current_max_value_product == None:
-                    affordable = False
-                elif product_values[current_max_value_product] < 0:
-                    affordable = False
-                elif current_max_value_product == "WHEAT":
-                    wheat_seed_wanted += 1
-                    start_money -= seed_cost["WHEAT"]
-                    update_value("WHEAT")
-                elif current_max_value_product == "CARROT":
-                    carrot_seed_wanted += 1
-                    start_money -= seed_cost["CARROT"]
-                    update_value("CARROT")
-                elif current_max_value_product == "MELON":
-                    melon_seed_wanted += 1
-                    start_money -= seed_cost["MELON"]
-                    update_value("MELON")
-                elif current_max_value_product == "TOMATO":
-                    tomato_seed_wanted += 1
-                    start_money -= seed_cost["TOMATO"]
-                    update_value("TOMATO")
-                elif current_max_value_product == "STRAWBERRY":
-                    strawberry_seed_wanted += 1
-                    start_money -= seed_cost["STRAWBERRY"]
-                    update_value("STRAWBERRY")
-                else:
-                    print('something went wrong with current_max_value_product:', current_max_value_product)
-                    break
-                total_seeds_and_animals += 1
+            budget = max(0, int(start_money))
+            chunks = build_chunks(
+                list(product_values.keys()), seed_cost, prices, projected_harvest, projected_inventory,
+                base_costs, T_values, below_funcs, below_targets, above_funcs, above_targets,
+                product_lifespan, product_cost_per_day, budget, max_units=empty_tiles
+            )
+            bought, total_daily_profit = solve_allocation_np(chunks, budget, empty_tiles)
+    
+            wheat_seed_wanted = bought.get("WHEAT", 0) - seeds.get("WHEAT", 0)
+            carrot_seed_wanted = bought.get("CARROT", 0) - seeds.get("CARROT", 0)
+            melon_seed_wanted = bought.get("MELON", 0) - seeds.get("MELON", 0)
+            tomato_seed_wanted = bought.get("TOMATO", 0) - seeds.get("TOMATO", 0)
+            strawberry_seed_wanted = bought.get("STRAWBERRY", 0) - seeds.get("STRAWBERRY", 0)
+            goose_wanted = bought.get("EGG", 0) - shed.get("GOOSE", 0)
+            cow_wanted = bought.get("MILK", 0) - shed.get("COW", 0)
+            sheep_wanted = bought.get("WOOL", 0) - shed.get("SHEEP", 0)
+
             if wheat_seed_wanted > 0:
                 market_orders.append(["BUY_SEED", "WHEAT", wheat_seed_wanted])
             if carrot_seed_wanted > 0:
